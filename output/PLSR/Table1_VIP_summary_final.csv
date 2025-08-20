@@ -1,0 +1,60 @@
+"Table 1. Sum of CGE-associated genes, as determined with PLSR, that belong to each sub-pathway within the curated lists of biosynthesis, degradation, and energy genes",,,,
+Metabolism,Pathway,Subpathway,Direction of association with CGE,
+,,,negative,positive
+Biosynthesis,Amino acid biosynthesis,Amino acid biosynthesis: Alanine,0,2
+,,Amino acid biosynthesis: Chorismate,0,1
+,,Amino acid biosynthesis: Cysteine,1,1
+,,Amino acid biosynthesis: Lysine/methionine,0,1
+,,Amino acid biosynthesis: Serine,2,2
+,,Amino acid biosynthesis: Tryptophan,0,1
+,,Amino acid bioysnthesis: shared or other,2,3
+,Lipid biosynthesis,Lipid biosynthesis: Fatty acid,1,0
+,,Lipid biosynthesis: Glycerolipid,1,0
+,,Lipid biosynthesis: Glycerophospholipid,1,0
+,Nucleotide biosynthesis,Nucleotide biosynthesis: purine,1,0
+,,Nucleotide biosynthesis: pyrimidine,2,2
+,,Nucleotide biosynthesis: ribonucleotide,1,1
+,Peptidoglycan biosynthesis,Peptidoglycan biosynthesis: Aminosugar production,0,1
+,,Peptidoglycan biosynthesis: Peptidoglycan unit synthesis,1,0
+,,Peptidoglycan biosynthesis: Remodeling,0,1
+,EPS biosynthesis,EPS biosynthesis: Acetan/xanthan,1,0
+,,EPS biosynthesis: Alginate,0,1
+,Teichoic acid biosynthesis,Teichoic acid biosynthesis: from UND-PP to wall teichoic acid,0,2
+Degradation,Amino acid degradation,Amino acid degradation: Alanine/aspartate/asparagine/glutamate/glutamine,2,1
+,,Amino acid degradation: Arginine/Proline,3,3
+,,Amino acid degradation: Cysteine/methionine,1,4
+,,Amino acid degradation: Lysine,1,0
+,,Amino acid degradation: Phenylalanine/tyrosine/tryptophan,2,4
+,,Amino acid degradation: Serine/glycine/threonine,2,0
+,,Amino acid degradation: Shared,2,0
+,Lipid degradation,Lipid degradation: other,1,0
+,Nucleotide degradation,Nucleotide degradation: purine,2,1
+,,Nucleotide degradation: pyrimidine,2,2
+,Xenobiotics degradation,Xenobiotics degradation: Aminobenzoate,1,2
+,,Xenobiotics degradation: Atrazine,0,1
+,,Xenobiotics degradation: Benzoate,1,8
+,,Xenobiotics degradation: Caprolactam,0,1
+,,Xenobiotics degradation: Chlorocyclohexane and chlorobenzene,0,1
+,,Xenobiotics degradation: Furfural,1,0
+,,Xenobiotics degradation: Naphthalene,0,2
+,,Xenobiotics degradation: Nitrotoluene,1,1
+,,Xenobiotics degradation: Shared,2,4
+,,Xenobiotics degradation: Steroid,0,1
+,,Xenobiotics degradation: Styrene,0,1
+,Aromatic ring degradation,Aromatic ring degradation: Dihydroxylation of aromatic ring,0,1
+,,Aromatic ring degradation: Dihyroxylation and meta-cleavage of aromatic ring,1,1
+,,Aromatic ring degradation: Ortho-cleavage of dihydroxylated aromatic ring,1,2
+,,Aromatic ring degradation: Ortho-cleavage of halogenated aromatic ring,0,1
+,,Aromatic ring degradation: Other pathway,0,4
+,,Aromatic ring degradation: Ring removal from polycyclic aromatic ring,0,1
+Energy,ATPase,ATPase: ATP-binding,2,3
+,,ATPase: F-type,1,0
+,,ATPase: P-type,1,0
+,Central C metabolism,Central C metabolism: Glycolysis/Gluconeogenesis,2,0
+,,Central C metabolism: PPP,1,0
+,,Central C metabolism: Pyruvate oxidation,1,0
+,,Central C metabolism: TCA cycle,0,1
+,Electron transport chain,ETC: Cytochrome C oxidase,3,0
+,,ETC: NADH reductase,1,3
+,Fermentation,Fermentation: to acetate,0,1
+,Pyruvate oxidation,Pyruvate oxidation: Pyruvate => acetyl-CoA,1,0

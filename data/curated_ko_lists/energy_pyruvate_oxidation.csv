@@ -1,0 +1,30 @@
+Metabolism,Shared,Shared1,KO,Name
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1,K00161,"PDHA, pdhA; pyruvate dehydrogenase E1 component alpha subunit [EC:1.2.4.1]"
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1,K00162,"PDHB, pdhB; pyruvate dehydrogenase E1 component beta subunit [EC:1.2.4.1]"
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1,K00163,aceE; pyruvate dehydrogenase E1 component [EC:1.2.4.1]
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1,K00627,"DLAT, aceF, pdhC; pyruvate dehydrogenase E2 component (dihydrolipoamide acetyltransferase) [EC:2.3.1.12]"
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K00189,"vorG; 2-oxoisovalerate ferredoxin oxidoreductase, gamma subunit [EC:1.2.7.7]"
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K00169,porA; pyruvate ferredoxin oxidoreductase alpha subunit [EC:1.2.7.1]
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K00170,porB; pyruvate ferredoxin oxidoreductase beta subunit [EC:1.2.7.1]
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K00171,porD; pyruvate ferredoxin oxidoreductase delta subunit [EC:1.2.7.1]
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K00172,porG; pyruvate ferredoxin oxidoreductase gamma subunit [EC:1.2.7.1]
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1a,K03737,"por, nifJ; pyruvate-ferredoxin/flavodoxin oxidoreductase [EC:1.2.7.1 1.2.7.-]"
+central C metabolic network,"Pyruvate oxidation, pyruvate => acetyl-CoA",1b,K00656,"E2.3.1.54, pflD; formate C-acetyltransferase [EC:2.3.1.54]"
+,succinate dehydrogenase/fumarate reductase,euk,k00234,"SDHA, SDH1; succinate dehydrogenase (ubiquinone) flavoprotein subunit [EC:1.3.5.1]"
+,succinate dehydrogenase/fumarate reductase,euk,k00235,"SDHB, SDH2; succinate dehydrogenase (ubiquinone) iron-sulfur subunit [EC:1.3.5.1]"
+,succinate dehydrogenase/fumarate reductase,euk,k00236,"SDHC, SDH3; succinate dehydrogenase (ubiquinone) cytochrome b560 subunit"
+,succinate dehydrogenase/fumarate reductase,euk,k00237,"SDHD, SDH4; succinate dehydrogenase (ubiquinone) membrane anchor subunit"
+,,euk,k25801,
+,,bac/arch,k00233,
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00239,"sdhA, frdA; succinate dehydrogenase / fumarate reductase, flavoprotein subunit [EC:1.3.5.1 1.3.5.4]"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00240,"sdhB, frdB; succinate dehydrogenase / fumarate reductase, iron-sulfur subunit [EC:1.3.5.1 1.3.5.4]"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00241,"sdhC, frdC; succinate dehydrogenase / fumarate reductase, cytochrome b subunit"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00242,"sdhD, frdD; succinate dehydrogenase / fumarate reductase, membrane anchor subunit"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00244,frdA; fumarate reductase flavoprotein subunit [EC:1.3.5.4]
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00245,frdB; fumarate reductase iron-sulfur subunit [EC:1.3.5.4]
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00246,frdC; fumarate reductase subunit C
+,succinate dehydrogenase/fumarate reductase,bac/arch,k00247,frdD; fumarate reductase subunit D
+,succinate dehydrogenase/fumarate reductase,bac/arch,k18859,"sdhD, frdD; succinate dehydrogenase / fumarate reductase, subunit D"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k18860,"sdhD, frdD; putative succinate dehydrogenase / fumarate reductase, subunit D"
+,succinate dehydrogenase/fumarate reductase,bac/arch,k25995,
+,succinate dehydrogenase/fumarate reductase,bac/arch,k25996,

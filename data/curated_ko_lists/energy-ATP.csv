@@ -1,0 +1,144 @@
+Metabolism,Shared,Shared2,KO,Name
+,bacterial,F-type,k02108,"ATPF0A, atpB; F-type H+-transporting ATPase subunit a"
+,bacterial,F-type,k02109,"ATPF0B, atpF; F-type H+-transporting ATPase subunit b"
+,bacterial,F-type,k02110,"ATPF0C, atpE; F-type H+-transporting ATPase subunit c"
+,bacterial,F-type,k02111,"ATPF1A, atpA; F-type H+/Na+-transporting ATPase subunit alpha [EC:7.1.2.2 7.2.2.1]"
+,bacterial,F-type,k02112,"ATPF1B, atpD; F-type H+/Na+-transporting ATPase subunit beta [EC:7.1.2.2 7.2.2.1]"
+,bacterial,F-type,k02113,"ATPF1D, atpH; F-type H+-transporting ATPase subunit delta"
+,bacterial,F-type,k02114,"ATPF1E, atpC; F-type H+-transporting ATPase subunit epsilon"
+,bacterial,F-type,k02115,"ATPF1G, atpG; F-type H+-transporting ATPase subunit gamma"
+,euk,F-type,k02129,"ATPeF0E, ATP5I; F-type H+-transporting ATPase subunit e"
+,euk,F-type,k02130,"ATPeF0F, ATP5J2; F-type H+-transporting ATPase subunit f"
+,euk,F-type,k02131,"ATPeF0F6, ATP5J; F-type H+-transporting ATPase subunit 6"
+,euk,F-type,k02144,ATPeV1H; V-type H+-transporting ATPase subunit H
+,euk,F-type,k02132,"ATPeF1A, ATP5A1, ATP1; F-type H+-transporting ATPase subunit alpha"
+,euk,F-type,k02133,"ATPeF1B, ATP5B, ATP2; F-type H+-transporting ATPase subunit beta [EC:7.1.2.2]"
+,euk,F-type,k02134,"ATPeF1D, ATP5D, ATP16; F-type H+-transporting ATPase subunit delta"
+,euk,F-type,k02135,"ATPeF1E, ATP5E, ATP15; F-type H+-transporting ATPase subunit epsilon"
+,euk,F-type,k02136,"ATPeF1G, ATP5C1, ATP3; F-type H+-transporting ATPase subunit gamma"
+,euk,F-type,k02137,"ATPeF0O, ATP5O, ATP5; F-type H+-transporting ATPase subunit O"
+,euk,F-type,k02125,"ATPeF08, MTATP8, ATP8; F-type H+-transporting ATPase subunit 8"
+,euk,F-type,k02126,"ATPeF0A, MTATP6, ATP6; F-type H+-transporting ATPase subunit a"
+,euk,F-type,k02127,"ATPeF0B, ATP5F1, ATP4; F-type H+-transporting ATPase subunit b"
+,euk,F-type,k02128,"ATPeF0C, ATP5G, ATP9; F-type H+-transporting ATPase subunit c"
+,euk,F-type,k02138,"ATPeF0D, ATP5H, ATP7; F-type H+-transporting ATPase subunit d"
+,euk,F-type,k02139,"ATPeFF, ATP17; F-type H+-transporting ATPase subunit f"
+,euk,F-type,k02140,"ATPeFG, ATP5L, ATP20; F-type H+-transporting ATPase subunit g"
+,euk,F-type,k02143,"ATPeFK, ATP19; F-type H+-transporting ATPase subunit k"
+,euk,F-type,k01549,"TIM11, ATP21; F-type H+-transporting ATP synthase subunit e"
+,euk,F-type,k02141,"ATPeFH, ATP14; F-type H+-transporting ATPase subunit h"
+,euk,F-type,k02142,"ATPeFJ, ATP18; F-type H+-transporting ATPase subunit j"
+,bact/arch,V/A-type,k02117,"ATPVA, ntpA, atpA; V/A-type H+/Na+-transporting ATPase subunit A [EC:7.1.2.2 7.2.2.1]"
+,bact/arch,V/A-type,k02118,"ATPVB, ntpB, atpB; V/A-type H+/Na+-transporting ATPase subunit B"
+,bact/arch,V/A-type,k02119,"ATPVC, ntpC, atpC; V/A-type H+/Na+-transporting ATPase subunit C"
+,bact/arch,V/A-type,k02120,"ATPVD, ntpD, atpD; V/A-type H+/Na+-transporting ATPase subunit D"
+,bact/arch,V/A-type,k02121,"ATPVE, ntpE, atpE; V/A-type H+/Na+-transporting ATPase subunit E"
+,bact/arch,V/A-type,k02122,"ATPVF, ntpF, atpF; V/A-type H+/Na+-transporting ATPase subunit F"
+,bact/arch,V/A-type,k02123,"ATPVI, ntpI, atpI; V/A-type H+/Na+-transporting ATPase subunit I"
+,bact/arch,V/A-type,k02124,"ATPVK, ntpK, atpK; V/A-type H+/Na+-transporting ATPase subunit K"
+,bact/arch,V/A-type,k02107,"ATPVG, ahaH, atpH; V/A-type H+/Na+-transporting ATPase subunit G/H"
+,euk,V type,k02145,"ATPeV1A, ATP6A; V-type H+-transporting ATPase subunit A [EC:7.1.2.2]"
+,euk,V type,k02147,"ATPeV1B, ATP6B; V-type H+-transporting ATPase subunit B"
+,euk,V type,k02148,"ATPeV1C, ATP6C; V-type H+-transporting ATPase subunit C"
+,euk,V type,k02149,"ATPeV1D, ATP6M; V-type H+-transporting ATPase subunit D"
+,euk,V type,k02150,"ATPeV1E, ATP6E; V-type H+-transporting ATPase subunit E"
+,euk,V type,k02151,"ATPeV1F, ATP6S14; V-type H+-transporting ATPase subunit F"
+,euk,V type,k02152,"ATPeV1G, ATP6G; V-type H+-transporting ATPase subunit G"
+,euk,V type,k02154,"ATPeV0A, ATP6N; V-type H+-transporting ATPase subunit a"
+,euk,V type,k02155,"ATPeV0C, ATP6L; V-type H+-transporting ATPase 16kDa proteolipid subunit"
+,euk,V type,k02146,"ATPeV0D, ATP6D; V-type H+-transporting ATPase subunit d"
+,euk,V type,k02153,"ATPeV0E, ATP6H; V-type H+-transporting ATPase subunit e"
+,euk,V type,k03661,"ATPeV0B, ATP6F; V-type H+-transporting ATPase 21kDa proteolipid subunit"
+,euk,H/K type,k03662,"ATPeVS1, ATP6S1; V-type H+-transporting ATPase S1 subunit"
+,euk,H/K type,K01542,ATP4A; H+/K+-exchanging ATPase subunit alpha [EC:7.2.2.19]
+,euk,H/K type,K01543,ATP4B; H+/K+-exchanging ATPase subunit beta [EC:7.2.2.19]
+,euk,H/K type,K01544,ATP12A; non-gastric H+/K+-exchanging ATPase [EC:7.2.2.19]
+,,P-type,k01535,"PMA1, PMA2; H+-transporting ATPase [EC:7.1.2.1]"
+,,P-type,K01536,ENA; P-type Na+/K+ transporter [EC:7.2.2.3 7.2.2.-]
+,,P-type,k01547,kdpB; potassium-transporting ATPase ATP-binding subunit [EC:7.2.2.6]
+,,P-type,k12956,ctpV; copper-transporting P-type ATPase V [EC:7.2.2.8]
+,,P-type,k17686,"copA, ctpA, ATP7; P-type Cu+ transporter [EC:7.2.2.8]"
+,,P-type,k01533,copB; P-type Cu2+ transporter [EC:7.2.2.9]
+,,P-type,k01537,ATP2C; P-type Ca2+ transporter type 2C [EC:7.2.2.10]
+,,P-type,k05850,ATP2B; P-type Ca2+ transporter type 2B [EC:7.2.2.10]
+,,P-type,k05853,ATP2A; P-type Ca2+ transporter type 2A [EC:7.2.2.10]
+,,P-type,k01534,zntA; Zn2+/Cd2+-exporting ATPase [EC:7.2.2.12 7.2.2.21]
+,,P-type,k01531,"mgtA, mgtB; P-type Mg2+ transporter [EC:7.2.2.14]"
+,,P-type,k23254,silP; P-type Ag+ transporter [EC:7.2.2.15]
+,,P-type,k12950,ctpC; manganese/zinc-transporting P-type ATPase C [EC:7.2.2.-]
+,,P-type,k01530,E7.6.2.1; phospholipid-translocating ATPase [EC:7.6.2.1]
+,,ATP-binding,k09697,natA; sodium transport system ATP-binding protein [EC:7.2.2.4]
+,,ATP-binding,k10830,"psaB, scaC; manganese/zinc transport system ATP-binding protein [EC:7.2.2.5]"
+,,ATP-binding,k11603,mntA; manganese transport system ATP-binding protein [EC:7.2.2.5]
+,,ATP-binding,k11710,"troB, mntB, znuC; manganese/zinc/iron transport system ATP- binding protein [EC:7.2.2.5]"
+,,ATP-binding,k19973,mntA; manganese transport system ATP-binding protein [EC:7.2.2.5]
+,,ATP-binding,k02010,"afuC, fbpC; iron(III) transport system ATP-binding protein [EC:7.2.2.7]"
+,,ATP-binding,k10824,"nikE, cntF; nickel transport system ATP-binding protein [EC:7.2.2.11]"
+,,ATP-binding,k15587,"nikD, cntD; nickel transport system ATP-binding protein [EC:7.2.2.11]"
+,,ATP-binding,k25106,
+,,ATP-binding,k25107,
+,,ATP-binding,k10829,fhuC; ferric hydroxamate transport system ATP-binding protein [EC:7.2.2.16]
+,,ATP-binding,k25290,
+,,ATP-binding,k23188,fepC; ferric enterobactin transport system ATP-binding protein [EC:7.2.2.17]
+,,ATP-binding,k23184,fecE; ferric citrate transport system ATP-binding protein [EC:7.2.2.18]
+,,ATP-binding,k09817,znuC; zinc transport system ATP-binding protein [EC:7.2.2.-]
+,,ATP-binding,k02036,pstB; phosphate transport system ATP-binding protein [EC:7.3.2.1]
+,,ATP-binding,k02041,phnC; phosphonate transport system ATP-binding protein [EC:7.3.2.2]
+,,ATP-binding,k02045,cysA; sulfate/thiosulfate transport system ATP-binding protein [EC:7.3.2.3]
+,,ATP-binding,k15578,"nrtC, nasD; nitrate/nitrite transport system ATP-binding protein [EC:3.6.3.-]"
+,,ATP-binding,k02017,modC; molybdate transport system ATP-binding protein [EC:7.3.2.5]
+,,ATP-binding,k06857,"tupC, vupC; tungstate transport system ATP-binding protein [EC:7.3.2.6]"
+,,ATP-binding,k15497,wtpC; molybdate/tungstate transport system ATP-binding protein [EC:7.3.2.5 7.3.2.6]
+,,ATP-binding,k02028,ABC.PA.A; polar amino acid transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k09972,"aapP, bztD; general L-amino acid transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k10000,artP; arginine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k10004,"gltL, aatP; glutamate/aspartate transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k10008,gluA; glutamate transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k10010,"tcyC, yecC; L-cystine transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k10017,hisP; histidine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k10021,"occP, nocP; octopine/nopaline transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k10025,aotP; arginine/ornithine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k10038,glnQ; glutamine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k10041,"peb1C, glnQ; aspartate/glutamate/glutamine transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k16960,tcyN; L-cystine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k17063,bgtA; arginine/lysine/histidine/glutamine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k23058,K23058; putative lysine/arginine/ornithine/histidine/octopine transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k23060,"artR, artM; arginine/lysine/histidine transport system ATP-binding protein [EC:7.4.2.1]"
+,,ATP-binding,k23064,lhpO; hydroxyproline transport system ATP-binding protein [EC:7.4.2.1]
+,,ATP-binding,k05653,"ABCB2, TAP1; ATP-binding cassette, subfamily B (MDR/TAP), member 2"
+,,ATP-binding,k05654,"ABCB3, TAP2; ATP-binding cassette, subfamily B (MDR/TAP), member 3"
+,,ATP-binding,k24819,
+,,ATP-binding,k09693,tagH; teichoic acid transport system ATP-binding protein [EC:7.5.2.4]
+,,ATP-binding,k06861,lptB; lipopolysaccharide export system ATP-binding protein [EC:3.6.3.-]
+,,ATP-binding,k11085,"msbA; ATP-binding cassette, subfamily B, bacterial MsbA [EC:3.6.3.-]"
+,,ATP-binding,k10441,rbsA; ribose transport system ATP-binding protein [EC:7.5.2.7]
+,,ATP-binding,k10551,alsA; D-allose transport system ATP-binding protein [EC:7.5.2.8]
+,,ATP-binding,k10820,ytfR; galactofuranose transport system ATP-binding protein [EC:7.5.2.9]
+,,ATP-binding,k10545,xylG; D-xylose transport system ATP-binding protein [EC:7.5.2.10]
+,,ATP-binding,k10542,mglA; methyl-galactoside transport system ATP-binding protein [EC:7.5.2.11]
+,,ATP-binding,k24712,
+,,ATP-binding,k10539,araG; L-arabinose transport system ATP-binding protein [EC:7.5.2.12]
+,,ATP-binding,k05658,"ABCB1, CD243; ATP-binding cassette, subfamily B (MDR/TAP), member 1 [EC:7.6.2.2]"
+,,ATP-binding,k05659,"ABCB4; ATP-binding cassette, subfamily B (MDR/TAP), member 4 [EC:7.6.2.2]"
+,,ATP-binding,k18104,"abcA, bmrA; ATP-binding cassette, subfamily B, bacterial AbcA/BmrA [EC:7.6.2.2]"
+,,ATP-binding,k05665,"ABCC1; ATP-binding cassette, subfamily C (CFTR/MRP), member 1 [EC:7.6.2.3]"
+,,ATP-binding,k05675,"ABCD1, ALD; ATP-binding cassette, subfamily D (ALD), member 1"
+,,ATP-binding,k05676,"ABCD2, ALDL1; ATP-binding cassette, subfamily D (ALD), member 2"
+,,ATP-binding,k05677,"ABCD3, PMP70; ATP-binding cassette, subfamily D (ALD), member 3"
+,,ATP-binding,k15628,"PXA; ATP-binding cassette, subfamily D (ALD), peroxisomal long-chain fatty acid import protein"
+,,ATP-binding,k25819,
+,,ATP-binding,k10834,
+,,ATP-binding,k25115,
+,,ATP-binding,k10831,tauB; taurine transport system ATP-binding protein [EC:7.6.2.7]
+,,ATP-binding,k05678,"ABCD4, PXMP1L; ATP-binding cassette, subfamily D (ALD), member 4"
+,,ATP-binding,k06074,btuD; vitamin B12 transport system ATP-binding protein [EC:7.6.2.8]
+,,ATP-binding,k25028,
+,,ATP-binding,k02000,proV; glycine betaine/proline transport system ATP-binding protein [EC:7.6.2.9]
+,,ATP-binding,k05847,opuA; osmoprotectant transport system ATP-binding protein [EC:7.6.2.9]
+,,ATP-binding,k05816,ugpC; sn-glycerol 3-phosphate transport system ATP-binding protein [EC:7.6.2.10]
+,,ATP-binding,k11072,potA; spermidine/putrescine transport system ATP-binding protein [EC:7.6.2.11]
+,,ATP-binding,k09689,kpsT; capsular polysaccharide transport system ATP-binding protein [EC:7.6.2.12]
+,,ATP-binding,k22923,vexC; Vi polysaccharide transport system ATP-binding protein [EC:7.6.2.12]
+,,ATP-binding,k15555,ssuB; sulfonate transport system ATP-binding protein [EC:3.6.3.-]
+,,ATP-binding,k02062,thiQ; thiamine transport system ATP-binding protein
+,,ATP-binding,k11076,potG; putrescine transport system ATP-binding protein

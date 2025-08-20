@@ -1,0 +1,28 @@
+KO,Enzyme_name,Reaction_CO2,Pathway_group,Direct_CO2_release,Notes
+K00163,pyruvate dehydrogenase E1 component,Pyruvate + Thiamin diphosphate <=> 2-(alpha-Hydroxyethyl)thiamine diphosphate + CO2,Yes,E1 does the decarboxylation
+K00161,Pyruvate dehydrogenase E1 subunit alpha (PDH),Pyruvate → Acetyl‑CoA + CO2 (TPP‑dependent),Central carbon – PDH/TCA link,Yes,E1 does the decarboxylation
+K00162,Pyruvate dehydrogenase E1 subunit beta (PDH),Pyruvate → Acetyl‑CoA + CO2 (TPP‑dependent),Central carbon – PDH/TCA link,Yes,E1 does the decarboxylation
+K00169,Pyruvate:ferredoxin oxidoreductase subunit alpha (PFOR),Pyruvate + CoA + Fd(ox) → Acetyl‑CoA + CO2 + Fd(red),Central carbon – anaerobic PDH alternative (PFOR),Yes,
+K00170,Pyruvate:ferredoxin oxidoreductase subunit beta (PFOR),Pyruvate + CoA + Fd(ox) → Acetyl‑CoA + CO2 + Fd(red),Central carbon – anaerobic PDH alternative (PFOR),Yes,
+K00171,Pyruvate:ferredoxin oxidoreductase subunit gamma (PFOR),Pyruvate + CoA + Fd(ox) → Acetyl‑CoA + CO2 + Fd(red),Central carbon – anaerobic PDH alternative (PFOR),Yes,
+K00172,Pyruvate:ferredoxin oxidoreductase subunit delta (PFOR),Pyruvate + CoA + Fd(ox) → Acetyl‑CoA + CO2 + Fd(red),Central carbon – anaerobic PDH alternative (PFOR),Yes,
+K00030,Isocitrate dehydrogenase (NAD+),Isocitrate + NAD+ → 2‑Oxoglutarate + CO2 + NADH,TCA cycle,Yes,
+K00031,Isocitrate dehydrogenase (NADP+),Isocitrate + NADP+ → 2‑Oxoglutarate + CO2 + NADPH,TCA cycle,Yes,
+K00164,2‑Oxoglutarate dehydrogenase E1 (OGDH),2‑Oxoglutarate + CoA + NAD+ → Succinyl‑CoA + CO2 + NADH,TCA cycle (OGDH complex),Yes,E1 is the decarboxylase; E2/E3 are transfer/redox
+K00174,2‑Oxoglutarate:ferredoxin oxidoreductase subunit alpha (OGOR),2‑Oxoglutarate + CoA + Fd(ox) → Succinyl‑CoA + CO2 + Fd(red),TCA analog – anaerobic alternative (OGOR),Yes,
+K00175,2‑Oxoglutarate:ferredoxin oxidoreductase subunit beta (OGOR),2‑Oxoglutarate + CoA + Fd(ox) → Succinyl‑CoA + CO2 + Fd(red),TCA analog – anaerobic alternative (OGOR),Yes,
+K00176,2‑Oxoglutarate:ferredoxin oxidoreductase subunit gamma (OGOR),2‑Oxoglutarate + CoA + Fd(ox) → Succinyl‑CoA + CO2 + Fd(red),TCA analog – anaerobic alternative (OGOR),Yes,
+K00177,2‑Oxoglutarate:ferredoxin oxidoreductase subunit delta (OGOR),2‑Oxoglutarate + CoA + Fd(ox) → Succinyl‑CoA + CO2 + Fd(red),TCA analog – anaerobic alternative (OGOR),Yes,
+K00033,6‑Phosphogluconate dehydrogenase,6‑Phospho‑D‑gluconate + NAD(P)+ → Ribulose‑5‑P + CO2 + NAD(P)H,Pentose phosphate pathway (oxidative),Yes,
+K00028,Malic enzyme (NAD‑dependent),L‑Malate + NAD+ → Pyruvate + CO2 + NADH,Anaplerotic shunts,Yes,
+K00029,Malic enzyme (NADP‑dependent),L‑Malate + NADP+ → Pyruvate + CO2 + NADPH,Anaplerotic shunts,Yes,
+K01610,Phosphoenolpyruvate carboxykinase (ATP),Oxaloacetate + ATP → PEP + CO2 + ADP + Pi,Gluconeogenesis / anaplerosis,Yes,
+K01611,Phosphoenolpyruvate carboxykinase (GTP),Oxaloacetate + GTP → PEP + CO2 + GDP,Gluconeogenesis / anaplerosis,Yes,
+K01568,Pyruvate decarboxylase,Pyruvate → Acetaldehyde + CO2,Fermentation,Yes,
+K00122,Formate dehydrogenase (NAD-dependent),Formate + NAD+ → CO2 + NADH,C1 metabolism,Yes,
+K00123,Formate dehydrogenase major subunit,Formate + NAD+ → CO2 + NADH,C1 metabolism,Yes,
+K00124,Formate dehydrogenase iron‑sulfur subunit,Formate + NAD+ → CO2 + NADH,C1 metabolism,Yes,
+K00281,Glycine cleavage system P‑protein (decarboxylating),"Glycine + H4‑folate → CO2 + NH3 + 5,10‑methylene‑THF",Glycine/1‑C metabolism,Yes,
+K01571,Oxaloacetate decarboxylase (Na+‑extruding) subunit alpha,Oxaloacetate → Pyruvate + CO2 (Na+ pump),Organic acid decarboxylases,Yes,
+K01569,Oxalate decarboxylase,Oxalate → Formate + CO2,Organic acid decarboxylases,Yes,
+K01427,Urease (alpha/catalytic subunit),Urea + H2O → CO2 + 2 NH3,Nitrogen metabolism,Yes,

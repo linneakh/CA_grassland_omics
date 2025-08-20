@@ -1,0 +1,1594 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.retina = 2)
+
+# Core
+library(tidyverse)
+library(ggplot2)
+library(pls)
+library(plsVarSel)
+
+# Extras
+library(viridis)
+library(viridisLite)
+library(patchwork)
+library(WGCNA)   # for corPvalueStudent
+library(grid)    # for unit()
+
+set.seed(123)
+# Aesthetics ---------------------------------------------------------------
+shapes_moisture <- c(x50 = 17, x100 = 16)
+
+col_list_moisture <- c("darkgreen", "brown")
+
+source("../scripts/Fig4-Fig5-FigS4-PLSR-KOs-functions.R")
+
+out_dir = "../figures/Fig5-PLSR/5/"
+out_dir_deg = "../figures/FigS4-PLSR/5/"
+
+r = 300
+w = 3.25
+h = 3
+w2 = 4
+
+```
+
+# Data import & preparation
+```{r import data}
+# CGE (CUE)
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+
+# Gene expression (VST, KO-level)
+datExpr.0b <- read.csv("../output/metaT/vst-ko-no-t0.csv", header = TRUE)
+datExpr <- datExpr.0b %>% tibble::column_to_rownames(var = "X") %>% mutate(across(everything(), as.numeric))
+
+# Merge cue + expression
+datExpr.cue <- datExpr %>% t() %>% as.data.frame() %>% tibble::rownames_to_column("SampleID")
+cue.all <- cue.only %>%
+  merge(datExpr.cue, by = "SampleID") %>%
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  dplyr::select(-Plot, -Moisture, -Timepoint) %>%
+  tibble::column_to_rownames("SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  dplyr::select(-CUE.metric)
+
+cue.timepoint <- cue.all %>% 
+  tibble::rownames_to_column("SampleID") %>% 
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE)
+
+```
+
+
+# PLSR (VIP selection)
+```{r}
+# Fit model, use 1 component for VIP as in your script
+m_full <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, validation = "LOO")
+m1     <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, ncomp = 1)
+
+# VIP (top 10%)
+VIP_df <- as.data.frame(VIP(m1, opt.comp = 1)) %>% setNames("VIP")
+q_95   <- quantile(VIP_df$VIP, probs = 0.95, na.rm = TRUE)
+VIP_top <- VIP_df %>% rownames_to_column("KO") %>% mutate(KO = gsub("`", "", KO)) %>% filter(VIP > q_95)
+
+vip_kos <- VIP_top$KO
+
+
+```
+
+
+
+# Curated KO lists
+
+```{r curated}
+# KEGG annotations (optional downstream)
+kegg.brite <- read.csv("../output/KEGG/Kegg_brite_all.csv") %>% dplyr::select(-any_of("X"))
+
+# Biosynthesis
+aa.biosynthesis    <- read.csv("../data/curated_ko_lists/biosynthesis_aa.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+lipid.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_lipid.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+nuc.biosynthesis   <- read.csv("../data/curated_ko_lists/biosynthesis_nucleotides.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+wall.biosynthesis  <- read.csv("../data/curated_ko_lists/biosynthesis_cell_wall.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+teich.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_teichoic.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+eps.biosynthesis   <- read.csv("../data/curated_ko_lists/biosynthesis_eps.csv")  %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+# Energy
+central <- read.csv("../data/curated_ko_lists/energy_central.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+ferm <- read.csv("../data/curated_ko_lists/energy_fermentation.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+pomp <- read.csv("../data/curated_ko_lists/energy_pomp.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+atp <- read.csv("../data/curated_ko_lists/energy-atp.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+pyrox <- read.csv("../data/curated_ko_lists/energy_pyruvate_oxidation.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+etc <- read.csv("../data/curated_ko_lists/energy-etc.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+# Degradation
+aa.deg <- read.csv("../data/curated_ko_lists/degradation_aa_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+lipid.deg <- read.csv("../data/curated_ko_lists/degradation_lipids_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+nuc.deg <- read.csv("../data/curated_ko_lists/degradation_nucleotides_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+
+
+
+```
+
+
+# Build per-category sums & panels
+```{r panels}
+# VIP ∩ curated KOs
+VIP_aa_bio    <- intersect(vip_kos, aa.biosynthesis$KO)
+VIP_lipid_bio <- intersect(vip_kos, lipid.biosynthesis$KO)
+VIP_nuc_bio   <- intersect(vip_kos, nuc.biosynthesis$KO)
+VIP_wall_bio  <- intersect(vip_kos, wall.biosynthesis$KO)
+VIP_teich_bio <- intersect(vip_kos, teich.biosynthesis$KO)
+VIP_eps_bio   <- intersect(vip_kos, eps.biosynthesis$KO)
+
+VIP_central <- intersect(vip_kos, central$KO)
+VIP_ferm    <- intersect(vip_kos, ferm$KO)
+VIP_pomp    <- intersect(vip_kos, pomp$KO)
+VIP_atp     <- intersect(vip_kos, atp$KO)
+VIP_pyrox   <- intersect(vip_kos, pyrox$KO)
+VIP_etc     <- intersect(vip_kos, etc$KO)
+
+# Top row (biosynthesis)
+d_bio_aa    <- make_sum_table(cue.timepoint, vip_kos, VIP_aa_bio)
+d_bio_lipid <- make_sum_table(cue.timepoint, vip_kos, VIP_lipid_bio)
+d_bio_nuc   <- make_sum_table(cue.timepoint, vip_kos, VIP_nuc_bio)
+d_bio_wall  <- make_sum_table(cue.timepoint, vip_kos, VIP_wall_bio)
+d_bio_eps <- make_sum_table(cue.timepoint, vip_kos, VIP_eps_bio)
+d_bio_teich <- make_sum_table(cue.timepoint, vip_kos, VIP_teich_bio)
+
+
+p_bio_aa    <- add_r_p_annot(make_correlation_plots(d_bio_aa),    d_bio_aa)    + ggtitle("Amino acid")
+ggsave(paste(out_dir, "aa-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "aa-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_lipid <- add_r_p_annot(make_correlation_plots(d_bio_lipid), d_bio_lipid) + ggtitle("Lipid")
+ggsave(paste(out_dir, "lipid-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "lipid-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_nuc   <- add_r_p_annot(make_correlation_plots(d_bio_nuc),   d_bio_nuc)   + ggtitle("Nucleotide")
+ggsave(paste(out_dir, "nuc-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "nuc-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_wall  <- add_r_p_annot(make_correlation_plots(d_bio_wall),  d_bio_wall)  + ggtitle("Peptidoglycan")
+ggsave(paste(out_dir, "wall-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "wall-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_eps  <- add_r_p_annot(make_correlation_plots(d_bio_eps),  d_bio_eps)  + ggtitle("EPS")
+ggsave(paste(out_dir, "eps-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "eps-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+# p_bio_teich  <- add_r_p_annot(make_correlation_plots(d_bio_teich),  d_bio_teich)  + ggtitle("Teichoic acid")
+# ggsave(paste(out_dir, "teich-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+# ggsave(paste(out_dir, "teich-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+# Middle row (energy)
+d_eng_central <- make_sum_table(cue.timepoint, vip_kos, VIP_central)
+d_eng_ferm  <- make_sum_table(cue.timepoint, vip_kos, VIP_ferm)
+d_eng_pyrox <- make_sum_table(cue.timepoint, vip_kos, VIP_pyrox)
+d_eng_etc  <- make_sum_table(cue.timepoint, vip_kos, VIP_etc)
+d_eng_pomp  <- make_sum_table(cue.timepoint, vip_kos, VIP_pomp)
+d_eng_atp <- make_sum_table(cue.timepoint, vip_kos, VIP_atp)
+
+
+p_eng_central <- add_r_p_annot(make_correlation_plots(d_eng_central), d_eng_central) + ggtitle("Central C metabolism")
+ggsave(paste(out_dir, "central-energy-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "central-energy-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_eng_ferm <- add_r_p_annot(make_correlation_plots(d_eng_ferm),d_eng_ferm) + ggtitle("Fermentation")
+# p_eng_pyrox <- add_r_p_annot(make_correlation_plots(d_eng_pyrox),d_eng_pyrox) + ggtitle("Pyruvate oxidation")
+p_eng_etc <- add_r_p_annot(make_correlation_plots(d_eng_etc), d_eng_etc)  + ggtitle("Electron transport chain")
+#p_eng_pomp  <- add_r_p_annot(make_correlation_plots(d_eng_pomp), d_eng_pomp) + ggtitle("POMP")
+
+p_eng_atp <- add_r_p_annot(make_correlation_plots(d_eng_atp), d_eng_atp) + ggtitle("ATPase")
+ggsave(paste(out_dir, "atp-energy-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "atp-energy-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+# Bottom row (summaries)
+all_bio_kos <- unique(c(VIP_aa_bio, VIP_lipid_bio, VIP_nuc_bio, VIP_wall_bio, VIP_teich_bio, VIP_eps_bio))
+all_eng_kos <- unique(c(VIP_central, VIP_pomp, VIP_ferm, VIP_atp, VIP_pyrox, VIP_etc))
+
+bio_all <- make_sum_table(cue.timepoint, vip_kos, all_bio_kos)
+eng_all <- make_sum_table(cue.timepoint, vip_kos, all_eng_kos)
+
+p_bio_all <- add_r_p_annot(make_correlation_plots(bio_all), bio_all) + ggtitle("All biosynthesis (VIP ∩ curated)")
+p_eng_all <- add_r_p_annot(make_correlation_plots_with_legend(eng_all), eng_all) + ggtitle("All energy (VIP ∩ curated)")
+
+# Ratio biosynthesis:energy
+ratio_df <- bio_all %>%
+  rename(bio_sum = sum.vst) %>%
+  inner_join(eng_all %>% rename(eng_sum = sum.vst), by = c("SampleID", "Timepoint", "Moisture", "CUE.metric.log")) %>%
+  mutate(sum.vst = bio_sum / pmax(eng_sum, 1e-6))
+
+p_ratio <- add_r_p_annot(make_correlation_plots(ratio_df), ratio_df) +
+  ylab("CGE metric (log)") + xlab("biosynthesis : energy ratio") + ggtitle("Biosynthesis : Energy")
+```
+
+# Assemble and save multi-panel figure (a–k)
+
+```{r grid}
+# combined <- (
+#   (p_bio_aa | p_bio_lipid | p_bio_nuc | p_bio_wall | p_bio_eps | p_bio_teich) /
+#   (p_eng_central | p_eng_ferm | p_eng_pyrox | p_eng_etc | p_eng_atp) /
+#   (p_bio_all | p_eng_all | p_ratio)
+# ) + plot_annotation(tag_levels = 'a')
+# 
+# combined
+
+row1 <- (p_bio_aa + theme(axis.title.x = element_blank()) |
+         p_bio_lipid + theme(axis.title.x = element_blank()) |
+         p_bio_nuc + theme(axis.title.x = element_blank()) |
+         p_bio_wall + theme(axis.title.x = element_blank()) |
+         # p_bio_teich + theme(axis.title.x = element_blank()) |
+         p_bio_eps + theme(axis.title.x = element_blank()))
+
+row2 <- (p_eng_central + theme(axis.title.x = element_blank()) |
+         p_eng_ferm + theme(axis.title.x = element_blank()) |
+         # p_eng_pyrox + theme(axis.title.x = element_blank()) |
+         p_eng_etc + theme(axis.title.x = element_blank()) |
+         p_eng_atp + theme(axis.title.x = element_blank()))
+
+# bottom row keeps x-axis labels
+row3 <- (p_bio_all | p_eng_all | p_ratio)
+
+combined <- (row1 / row2 / row3) 
+
+
+```
+
+```{r save}
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_05.png"), plot = combined, width = 13, height = 9, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_05.pdf"), plot = combined, width = 13, height = 9, units = "in", dpi = 300)
+```
+
+
+```{r plot correlations for biosynthesis}
+r = 300
+w = 3.25
+h = 3
+w2 = 4
+
+########Paul's aa biosynthesis genes
+aa.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_aa.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#235 total
+
+aa.genes = aa.biosynthesis$KO
+
+Paul.bio.aa.kegg <- VIP.kegg %>%
+  filter(Query %in% aa.genes)
+
+VIP.aa.genes <- Paul.bio.aa.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+aa.biosynthesis.Paul.VIP <- aa.biosynthesis %>%
+  filter(KO %in% VIP.aa.genes) %>%
+  dplyr::select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#16 genes("K01655" (+) lysine; "K14727" (+) alanine;  "K14682" (+) arg/pro; "K00558" (+) cyst; "K02203" (+) gyc/ser/thr; "K13832" (+) phenl/tyr/try; 
+#"K13497" (+) tryp; "K01079" (-) serine; "K14267" (-) lysine)
+
+#add column for linear regression
+cue.aa <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.aa.genes, Timepoint, Moisture) 
+
+cue.aa.sum <- cue.aa %>%
+  gather(key = "AA_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.aa.subset <- cue.aa %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of aa biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(y=cue.aa.sum$CUE.metric.log, x=cue.aa.sum$sum.vst)) #0.55
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.aa.sum)) #0.00030
+
+cue.aa.sum$Timepoint <- factor(cue.aa.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.aa.sum$Moisture <- factor(cue.aa.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.aa.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/aa-biosynthesis-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/aa-biosynthesis-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+##Cysteine and methione metabolism subpathway
+
+
+########Paul's lipid biosynthesis genes
+lipid.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_lipid.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#122 genes
+
+lipid.genes = lipid.biosynthesis$KO
+
+Paul.bio.lipid.kegg <- VIP.kegg %>%
+  filter(Query %in% lipid.genes)
+
+VIP.lipid.genes <- Paul.bio.lipid.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+lipid.biosynthesis.Paul.VIP <- lipid.biosynthesis %>%
+  filter(KO %in% VIP.lipid.genes) %>%
+  dplyr::select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#2 genes (K00647 (-) fabB; K00863 (-) DAK)
+
+#add column for linear regression
+cue.lipid <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.lipid.genes, Timepoint, Moisture) 
+
+cue.lipid.sum <- cue.lipid %>%
+  gather(key = "Lipid_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.lipid.subset <- cue.lipid %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of lipid biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(x=cue.lipid.sum$CUE.metric.log, y = cue.lipid.sum$sum.vst)) #-0.51
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.lipid.sum)) #0.0010
+
+
+cue.lipid.sum$Timepoint <- factor(cue.lipid.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.lipid.sum$Moisture <- factor(cue.lipid.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.lipid.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/lipid-biosynthesis-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/lipid-biosynthesis-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's nucleotide biosynthesis genes
+nuc.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_nucleotides.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#n=93
+
+nuc.genes = nuc.biosynthesis$KO
+
+Paul.bio.nuc.kegg <- VIP.kegg %>%
+  filter(Query %in% nuc.genes)
+
+VIP.nuc.genes <- Paul.bio.nuc.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+nuc.biosynthesis.Paul.VIP <- nuc.biosynthesis %>%
+  filter(KO %in% VIP.nuc.genes) %>%
+  dplyr::select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#6 genes ("K01591" "K00254" "K00525" "K17828")
+
+#add column for linear regression
+cue.nuc <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.nuc.genes, Timepoint, Moisture) 
+
+cue.nuc.sum <- cue.nuc %>%
+  gather(key = "Nucleotide_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.nuc.subset <- cue.nuc %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of nuc biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(y=cue.nuc.sum$CUE.metric.log, x = cue.nuc.sum$sum.vst)) #0.11
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.nuc.sum)) #0.55
+
+
+cue.nuc.sum$Timepoint <- factor(cue.nuc.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.nuc.sum$Moisture <- factor(cue.nuc.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.nuc.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+##pyrimidine metabolism
+nuc.biosynthesis.Paul.VIP.pyrimidine <- nuc.biosynthesis.Paul.VIP %>%
+  filter(grepl("Pyrimidine metabolism", Level3))
+
+#add column for linear regression
+cue.nuc.pyrimidine <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, nuc.biosynthesis.Paul.VIP.pyrimidine$KO, Timepoint, Moisture) 
+
+cue.nuc.pyrimidine.sum <- cue.nuc.pyrimidine %>%
+  gather(key = "Nucleotide_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.nuc.pyrimidine.subset <- cue.nuc.pyrimidine %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of nuc biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(y=cue.nuc.pyrimidine.sum$CUE.metric.log, x = cue.nuc.pyrimidine.sum$sum.vst)) #-0.010
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.nuc.sum)) #0.95
+
+
+cue.nuc.pyrimidine.sum$Timepoint <- factor(cue.nuc.pyrimidine.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.nuc.pyrimidine.sum$Moisture <- factor(cue.nuc.pyrimidine.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.nuc.pyrimidine.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-pyrimidine.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-pyrimidine.pdf") , dpi = r, height = h, width = w, units = "in")
+
+##purine metabolism
+nuc.biosynthesis.Paul.VIP.purine <- nuc.biosynthesis.Paul.VIP %>%
+  filter(grepl("Purine metabolism", Level3))
+
+#add column for linear regression
+cue.nuc.purine <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, nuc.biosynthesis.Paul.VIP.purine$KO, Timepoint, Moisture) 
+
+cue.nuc.purine.sum <- cue.nuc.purine %>%
+  gather(key = "Nucleotide_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.nuc.purine.subset <- cue.nuc.purine %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of nuc biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(y=cue.nuc.purine.sum$CUE.metric.log, x = cue.nuc.purine.sum$sum.vst)) #0.12
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.nuc.sum)) #0.45
+
+
+cue.nuc.purine.sum$Timepoint <- factor(cue.nuc.purine.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.nuc.purine.sum$Moisture <- factor(cue.nuc.purine.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.nuc.purine.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-purine.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/nucleotide-biosynthesis-purine.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's cell wall (peptidoglycan) biosynthesis genes
+wall.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_cell_wall.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#97 genes
+
+wall.genes = wall.biosynthesis$KO
+
+Paul.bio.wall.kegg <- VIP.kegg %>%
+  filter(Query %in% wall.genes)
+
+VIP.wall.genes <- Paul.bio.wall.kegg$Query
+
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+wall.biosynthesis.Paul.VIP <- wall.biosynthesis %>%
+  filter(KO %in% VIP.wall.genes) %>%
+  dplyr::select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#2 genes (K02473 and K03806)
+
+#add column for linear regression
+cue.wall <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.wall.genes, Timepoint, Moisture) 
+
+cue.wall.sum <- cue.wall %>%
+  gather(key = "Cell_wall_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.wall.subset <- cue.wall %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of wall biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(x=cue.wall.sum$CUE.metric.log, y = cue.wall.sum$sum.vst)) #0.35
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.wall.sum)) #0.029
+
+
+cue.wall.sum$Timepoint <- factor(cue.wall.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.wall.sum$Moisture <- factor(cue.wall.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.wall.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/cell-wall-biosynthesis-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/cell-wall-biosynthesis-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+
+########Paul's teichoic acid biosynthesis genes (there were none in the list of plsr genes)
+teich.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_teichoic.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#42 genes
+
+teich.genes = teich.biosynthesis$KO
+
+Paul.bio.teich.kegg <- VIP.kegg %>%
+  filter(Query %in% teich.genes)
+
+VIP.teich.genes <- Paul.bio.teich.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+teich.biosynthesis.Paul.VIP <- teich.biosynthesis %>%
+  filter(KO %in% VIP.teich.genes) %>%
+  select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#2 genes
+
+#add column for linear regression
+cue.teich <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.teich.genes, Timepoint, Moisture) 
+
+cue.teich.sum <- cue.teich %>%
+  gather(key = "Cell_wall_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.teich.subset <- cue.teich %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of wall biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(y=cue.teich.sum$CUE.metric.log, x = cue.teich.sum$sum.vst)) #0.29
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.teich.sum)) #0.071
+
+
+cue.teich.sum$Timepoint <- factor(cue.teich.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.teich.sum$Moisture <- factor(cue.teich.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.teich.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/teich-biosynthesis.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/teich-biosynthesis.pdf") , dpi = r, height = h, width = w, units = "in")
+
+########Paul's eps biosynthesis genes
+eps.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_eps.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#77 genes
+
+eps.genes = eps.biosynthesis$KO
+
+Paul.bio.eps.kegg <- VIP.kegg %>%
+  filter(Query %in% eps.genes)
+
+VIP.eps.genes <- Paul.bio.eps.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+eps.biosynthesis.Paul.VIP <- eps.biosynthesis %>%
+  filter(KO %in% VIP.eps.genes) %>%
+  dplyr::select(Biomolecule, Shared, Shared2, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#2 genes
+
+#add column for linear regression
+cue.eps <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.eps.genes, Timepoint, Moisture) 
+
+cue.eps.sum <- cue.eps %>%
+  gather(key = "eps_biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.eps.subset <- cue.eps %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+
+#correlation with sum of eps biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(x=cue.eps.sum$CUE.metric.log, y = cue.eps.sum$sum.vst)) #0.095
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.eps.sum)) #0.57
+
+
+cue.eps.sum$Timepoint <- factor(cue.eps.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.eps.sum$Moisture <- factor(cue.eps.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.eps.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/eps-biosynthesis-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/eps-biosynthesis-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Sum of Paul's biosynthesis geens
+biosynthesis <- rbind(eps.biosynthesis.Paul.VIP, wall.biosynthesis.Paul.VIP, lipid.biosynthesis.Paul.VIP, aa.biosynthesis.Paul.VIP, nuc.biosynthesis.Paul.VIP)
+
+bio.genes = biosynthesis$KO
+
+Paul.bio.kegg <- VIP.kegg %>%
+  filter(Query %in% bio.genes)
+
+#add column for linear regression
+cue.bio <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, bio.genes, Timepoint, Moisture) 
+
+cue.bio.sum <- cue.bio %>%
+  gather(key = "biosynthesis", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.bio.subset <- cue.bio %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of  biosynthesis  genes
+#pearson
+cor <- as.matrix(cor(x=cue.bio.sum$CUE.metric.log, y = cue.bio.sum$sum.vst)) #0.48
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.bio.sum)) #0.0018
+
+
+cue.bio.sum$Timepoint <- factor(cue.bio.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.bio.sum$Moisture <- factor(cue.bio.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.bio.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/biosynthesis-Paul-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/biosynthesis-Paul-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+#summary: 30 biosynthesis genes from Paul's list
+```
+
+
+
+
+
+```{r correlation with energy genes - Paul's}
+########Paul's central genes
+central <- read.csv("../data/curated_ko_lists/energy_central.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#150 gens
+
+central.genes = central$KO
+
+Paul.central.kegg <- VIP.kegg %>%
+  filter(Query %in% central.genes)
+
+VIP.central.genes <- Paul.central.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+central.Paul.VIP <- central %>%
+  filter(KO %in% VIP.central.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared2, KO, Name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#5 genes(K01808 [PPP], K01834 [glycolysis/gluconeogenesis], K18118 [TCA cycle])
+
+#add column for linear regression
+cue.central <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.central.genes, Timepoint, Moisture) 
+
+cue.central.sum <- cue.central %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.central.subset <- cue.central %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+#correlation with sum of central energy   genes
+#pearson
+cor <- as.matrix(cor(x=cue.central.sum$CUE.metric.log, y = cue.central.sum$sum.vst)) #-0.20
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.central.sum)) #0.23
+
+
+cue.central.sum$Timepoint <- factor(cue.central.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.central.sum$Moisture <- factor(cue.central.sum$Moisture, levels = c("x50", "x100"))
+
+
+ggsave(paste("../figures/Fig5-PLSR/10/energy-central-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-central-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's energy fermentation genes
+ferm <- read.csv("../data/curated_ko_lists/energy_fermentation.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#97 genes
+
+ferm.genes = ferm$KO
+
+Paul.ferm.kegg <- VIP.kegg %>%
+  filter(Query %in% ferm.genes)
+
+VIP.ferm.genes <- Paul.ferm.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+ferm.Paul.VIP <- ferm %>%
+  filter(KO %in% VIP.ferm.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared2, KO, Name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#1 genes (K18118)
+
+#add column for linear regression
+cue.ferm <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.ferm.genes, Timepoint, Moisture) 
+
+cue.ferm.sum <- cue.ferm %>%
+  gather(key = "Energy_fermentation", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.ferm.subset <- cue.ferm %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+
+#correlation with sum of energy fermentation genes
+#pearson
+cor <- as.matrix(cor(x=cue.ferm.sum$CUE.metric.log, y = cue.ferm.sum$sum.vst)) #0.29
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.ferm.sum)) #0.070
+
+
+cue.ferm.sum$Timepoint <- factor(cue.ferm.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.ferm.sum$Moisture <- factor(cue.ferm.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.ferm.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/energy-fermentation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-fermentation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's energy pomp (pyruvate, oxalaceate, malate pathways?) genes
+pomp <- read.csv("../data/curated_ko_lists/energy_pomp.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#23 genes
+
+pomp.genes = pomp$KO
+
+Paul.pomp.kegg <- VIP.kegg %>%
+  filter(Query %in% pomp.genes)
+
+VIP.pomp.genes <- Paul.pomp.kegg$Query
+
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+pomp.Paul.VIP <- pomp %>%
+  filter(KO %in% VIP.pomp.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared2, KO, Name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#0 genes
+
+
+########Paul's energy atp genes
+atp <- read.csv("../data/curated_ko_lists/energy-atp.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#143 genes
+
+atp.genes = atp$KO
+
+Paul.atp.kegg <- VIP.kegg %>%
+  filter(Query %in% atp.genes)
+
+VIP.atp.genes <- Paul.atp.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+atp.Paul.VIP <- atp %>%
+  filter(KO %in% VIP.atp.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared2, KO, Name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#3 genes (K02133 [oxidative phosphorylation], K10004 [glutamate transport], K11710 [manganese transport])
+
+#add column for linear regression
+cue.atp <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.atp.genes, Timepoint, Moisture) 
+
+cue.atp.sum <- cue.atp %>%
+  gather(key = "Energy_atp", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.atp.subset <- cue.atp %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of energy atp genes
+#pearson
+cor <- as.matrix(cor(x=cue.atp.sum$CUE.metric.log, y = cue.atp.sum$sum.vst)) #0.056
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.atp.sum)) #0.73
+
+
+cue.atp.sum$Timepoint <- factor(cue.atp.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.atp.sum$Moisture <- factor(cue.atp.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.atp.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/energy-ATP-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-ATP-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+
+########Paul's energy pyruvate oxidation
+pyrox <- read.csv("../data/curated_ko_lists/energy_pyruvate_oxidation.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#29 genes
+
+pyrox.genes = pyrox$KO
+
+Paul.pyrox.kegg <- VIP.kegg %>%
+  filter(Query %in% pyrox.genes)
+
+VIP.pyrox.genes <- Paul.pyrox.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+pyrox.Paul.VIP <- pyrox %>%
+  filter(KO %in% VIP.pyrox.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared1, KO, Name) %>%
+  rename(Shared2 = Shared1) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#1 genes
+
+#add column for linear regression
+cue.pyrox <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.pyrox.genes, Timepoint, Moisture) 
+
+cue.pyrox.sum <- cue.pyrox %>%
+  gather(key = "Energy_atp", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.pyrox.subset <- cue.pyrox %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of energy atp genes
+#pearson
+cor <- as.matrix(cor(x=cue.pyrox.sum$CUE.metric.log, y = cue.pyrox.sum$sum.vst)) #-0.22
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.pyrox.sum)) #0.17
+
+
+cue.pyrox.sum$Timepoint <- factor(cue.pyrox.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.pyrox.sum$Moisture <- factor(cue.pyrox.sum$Moisture, levels = c("x50", "x100"))
+
+
+p <- make_correlation_plots(cue.pyrox.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/energy-pyrox-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-pyrox-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's electron transport chain
+etc <- read.csv("../data/curated_ko_lists/energy-etc.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#161 genes
+
+etc.genes = etc$KO
+
+Paul.etc.kegg <- VIP.kegg %>%
+  filter(Query %in% etc.genes)
+
+VIP.etc.genes <- Paul.etc.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+etc.Paul.VIP <- etc %>%
+  filter(KO %in% VIP.etc.genes) %>%
+  dplyr::select(Metabolism, Shared, Shared2, KO, Name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#7 genes (K02297, K03953, K13378)
+
+#add column for linear regression
+cue.etc <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.etc.genes, Timepoint, Moisture) 
+
+cue.etc.sum <- cue.etc %>%
+  gather(key = "Energy_etc", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.etc.subset <- cue.etc %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of energy etc genes
+#pearson
+cor <- as.matrix(cor(x=cue.etc.sum$CUE.metric.log, y = cue.etc.sum$sum.vst, method = "spearman")) #-0.11
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.etc.sum)) #0.52
+
+
+cue.etc.sum$Timepoint <- factor(cue.etc.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.etc.sum$Moisture <- factor(cue.etc.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.etc.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/energy-electron-transport-chain-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-electron-transport-chain-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+
+########Sum of Paul's energy geens
+energy <- rbind(central.Paul.VIP, pomp.Paul.VIP, ferm.Paul.VIP, pyrox.Paul.VIP, etc.Paul.VIP)
+
+energy.genes = energy$KO
+
+Paul.energy.kegg <- VIP.kegg %>%
+  filter(Query %in% energy.genes)
+#6 genes
+
+#add column for linear regression
+cue.energy <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, energy.genes, Timepoint, Moisture) 
+
+cue.energy.sum <- cue.energy %>%
+  gather(key = "energy", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.energy.subset <- cue.energy %>%
+  column_to_rownames(var = "SampleID") %>%
+  dplyr::select(-c(Moisture, Timepoint))
+
+
+#correlation with sum of  energy  genes
+#pearson
+cor <- as.matrix(cor(x=cue.energy.sum$CUE.metric.log, y = cue.energy.sum$sum.vst)) #-0.17
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.energy.sum)) #0.30
+
+
+cue.energy.sum$Timepoint <- factor(cue.energy.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.energy.sum$Moisture <- factor(cue.energy.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.energy.sum)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/energy-Paul-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/energy-Paul-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+```
+
+
+```{r biosynthesis:energy}
+
+cue.bio.sum.to.merge <- cue.bio.sum %>%
+  mutate(metabolism = "biosynthesis")
+
+cue.energy.sum.to.merge <- cue.energy.sum %>%
+  mutate(metabolism = "energy")
+
+cue.bio.energy <- rbind(cue.bio.sum.to.merge, cue.energy.sum.to.merge)
+
+
+cue.bio.energy.ratio <- cue.bio.energy %>%
+  spread(key = metabolism, value = sum.vst) %>%
+  mutate(ratio.bio.energy = biosynthesis/energy)
+
+cor <- as.matrix(cor(x=cue.bio.energy.ratio$CUE.metric.log, y = cue.bio.energy.ratio$ratio.bio.energy)) #0.40
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.bio.energy.ratio)) #0.011
+
+cue.bio.energy.ratio$Timepoint <- factor(cue.bio.energy.ratio$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.bio.energy.ratio$Moisture <- factor(cue.bio.energy.ratio$Moisture, levels = c("x50", "x100"))
+
+p <- ggplot(data = cue.bio.energy.ratio, aes_string(x="CUE.metric.log", y="ratio.bio.energy", color = "Timepoint", shape = "Moisture")) +
+  geom_point(size = 3) +
+    scale_color_viridis(discrete = TRUE, direction = -1, labels = c("0h", "3h", "24h", "48h", "72h", "168h")) +
+    scale_shape_manual(values = shapes_moisture, breaks = c("x50", "x100"),labels =c("50%", "100%")) +
+    ylab("ratio") +
+    xlab("CGE metric (log)") +
+    geom_smooth(aes(group = "Moisture"), method = "lm", se = FALSE, color = "red4", size = 0.5) +  # Add linear trendline
+    theme_bw() +
+    theme( panel.grid.major = element_blank(),   # ← removes major grid lines
+           panel.grid.minor = element_blank() )#)
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/bio-to-energy-ratio-single-regression.png") , dpi = r, height = h, width = w2, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/bio-to-energy-ratio-single-regression.pdf") , dpi = r, height = h, width = w2, units = "in")
+
+
+```
+
+
+```{r correlation with degradation genes - Paul's}
+########Paul's aa degradation genes
+aa.deg <- read.csv("../data/curated_ko_lists/degradation_aa_LH.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#281 genes
+
+aa.deg.genes = aa.deg$KO
+
+Paul.aa.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% aa.deg.genes)
+
+VIP.aa.deg.genes <- Paul.aa.deg.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+aa.deg.Paul.VIP <- aa.deg %>%
+  filter(KO %in% VIP.aa.deg.genes) %>%
+  dplyr::select(Pathway, Subpathway, shared, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#25 genes (K01779 (-) aspartate; K00657 (-) arg/pro.; K00166 (-) shared; K01750 (-) arg; K26064 (-) lysine; K01480 (+) arg/prol; K16844 (+) cys/meth; K16171 (+) phenyl/tyr/trp;
+#K01826 (+) phen/tyr/trp; K00558 (+) cys/meth; K04113 (+) phen/tyr/try)
+
+#add column for linear regression
+cue.aa.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.aa.deg.genes, Timepoint, Moisture) 
+
+cue.aa.deg.sum <- cue.aa.deg %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.aa.deg.subset <- cue.aa.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+
+#sum of amino acid degradation genes
+cor <- as.matrix(cor(x=cue.aa.deg.sum$CUE.metric.log, y = cue.aa.deg.sum$sum.vst)) #0.15
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.aa.deg.sum)) #0.35
+
+cue.aa.deg.sum$Timepoint <- factor(cue.aa.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.aa.deg.sum$Moisture <- factor(cue.aa.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.aa.deg.sum)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/aa-degradation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/aa-degradation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+##subset - phenylalanine, tyrosine, tryptophan
+aa.deg.Paul.VIP.phenyl <- aa.deg.Paul.VIP %>%
+  filter(Subpathway == "phenylalanine, tyrosine, tryptophan")
+#6 genes
+
+
+#add column for linear regression
+cue.aa.deg.phenyl <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, aa.deg.Paul.VIP.phenyl$KO, Timepoint, Moisture) 
+
+cue.aa.deg.sum.phenyl <- cue.aa.deg.phenyl %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.aa.deg.phenyl.subset <- cue.aa.deg.phenyl %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+
+#sum of amino acid degradation genes
+cor <- as.matrix(cor(y=cue.aa.deg.sum.phenyl$CUE.metric.log, x = cue.aa.deg.sum.phenyl$sum.vst)) #0.34
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.aa.deg.sum.phenyl)) #0.036
+
+cue.aa.deg.sum.phenyl$Timepoint <- factor(cue.aa.deg.sum.phenyl$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.aa.deg.sum.phenyl$Moisture <- factor(cue.aa.deg.sum.phenyl$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.aa.deg.sum.phenyl)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/aa-degradation-phenyl-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/aa-degradation-phenyl-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+##subset - arg,prol degradation
+aa.deg.Paul.VIP.arg <- aa.deg.Paul.VIP %>%
+  filter(Subpathway == "arg, prol degradation")
+#6 genes
+
+
+#add column for linear regression
+cue.aa.deg.arg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, aa.deg.Paul.VIP.arg$KO, Timepoint, Moisture) 
+
+cue.aa.deg.sum.arg <- cue.aa.deg.arg %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.aa.deg.arg.subset <- cue.aa.deg.arg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+
+#sum of amino acid degradation genes
+cor <- as.matrix(cor(y=cue.aa.deg.sum.arg$CUE.metric.log, x = cue.aa.deg.sum.arg$sum.vst)) #-0.13
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.aa.deg.sum.arg)) #0.41
+
+cue.aa.deg.sum.arg$Timepoint <- factor(cue.aa.deg.sum.arg$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.aa.deg.sum.arg$Moisture <- factor(cue.aa.deg.sum.arg$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.aa.deg.sum.arg)
+
+print(p)
+ggsave(paste("../figures/Fig5-PLSR/10/aa-degradation-arg-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/Fig5-PLSR/10/aa-degradation-arg-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+
+########Paul's lipid degradation genes 
+lipid.deg <- read.csv("../data/curated_KO_lists/degradation_lipids_LH.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#68 genes
+
+lipid.deg.genes = lipid.deg$KO
+
+Paul.lipid.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% lipid.deg.genes)
+
+VIP.lipid.deg.genes <- Paul.lipid.deg.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+lipid.deg.Paul.VIP <- lipid.deg %>%
+  filter(KO %in% VIP.lipid.deg.genes) %>%
+  select(Pathway, Subpathway, shared, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#1 genes (K05939 (-) aas)
+
+#add column for linear regression
+cue.lipid.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.lipid.deg.genes, Timepoint, Moisture) 
+
+cue.lipid.deg.sum <- cue.lipid.deg %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.lipid.deg.subset <- cue.lipid.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+
+#sum of lipid degradation genes
+cor <- as.matrix(cor(x=cue.lipid.deg.sum$CUE.metric.log, y = cue.lipid.deg.sum$sum.vst)) #-0.35
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.lipid.deg.sum)) #0.027
+
+cue.lipid.deg.sum$Timepoint <- factor(cue.lipid.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.lipid.deg.sum$Moisture <- factor(cue.lipid.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.lipid.deg.sum)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/lipid-degradation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/lipid-degradation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's nucleotide degradation genes
+nuc.deg <- read.csv("../data/curated_ko_lists/degradation_nucleotides_LH.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#60 genes
+
+nuc.deg.genes = nuc.deg$KO
+
+Paul.nuc.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% nuc.deg.genes)
+
+VIP.nuc.deg.genes <- Paul.nuc.deg.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+nuc.deg.Paul.VIP <- nuc.deg %>%
+  filter(KO %in% VIP.nuc.deg.genes) %>%
+  select(Pathway, Subpathway, shared, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#7 genes (K07023 (+) pyrimidine/purine; K16066 (+) pyrimidine; K16840 (-) purine; K16841 (-) purine)
+
+#add column for linear regression
+cue.nuc.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.nuc.deg.genes, Timepoint, Moisture) 
+
+cue.nuc.deg.sum <- cue.nuc.deg %>%
+  gather(key = "Nuc_deg", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.nuc.deg.subset <- cue.nuc.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+
+#sum of nucleotide degradation genes
+cor <- as.matrix(cor(y=cue.nuc.deg.sum$CUE.metric.log, x = cue.nuc.deg.sum$sum.vst)) #-0.08
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.nuc.deg.sum)) #0.61
+
+cue.nuc.deg.sum$Timepoint <- factor(cue.nuc.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.nuc.deg.sum$Moisture <- factor(cue.nuc.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.nuc.deg.sum)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/nucleotide-degradation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/nucleotide-degradation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's armotic degradation genes
+aro.deg <- read.csv("../data/curated_ko_lists/degradation_aromatics.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#458 genes
+
+aro.deg.genes = aro.deg$KO
+
+Paul.aro.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% aro.deg.genes)
+
+VIP.aro.deg.genes <- Paul.aro.deg.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+aro.deg.Paul.VIP <- aro.deg %>%
+  filter(KO %in% VIP.aro.deg.genes) %>%
+  select(Pathway, Subpathway, shared, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#28 genes
+
+#add column for linear regression
+cue.aro.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.aro.deg.genes, Timepoint, Moisture) 
+
+cue.aro.deg.sum <- cue.aro.deg %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.aro.deg.subset <- cue.aro.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+#sum of aromatic degradation genes
+cor <- as.matrix(cor(y=cue.aro.deg.sum$CUE.metric.log, x = cue.aro.deg.sum$sum.vst)) #0.50
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.aro.deg.sum)) #0.00099
+
+cue.aro.deg.sum$Timepoint <- factor(cue.aro.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.aro.deg.sum$Moisture <- factor(cue.aro.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.aro.deg.sum)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/aromatic-degradation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/aromatic-degradation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+########Paul's armotic ring degradation genes
+ring.deg <- read.csv("../data/curated_ko_lists/degradation_rings.csv", header = TRUE) %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>%
+  filter(KO != "")
+#211 genes
+
+ring.deg.genes = ring.deg$KO
+
+Paul.ring.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% ring.deg.genes)
+
+VIP.ring.deg.genes <- Paul.ring.deg.kegg$Query
+
+#filter Paul's list to VIP genes and merge with VIP.kegg
+ring.deg.Paul.VIP <- ring.deg %>%
+  filter(KO %in% VIP.ring.deg.genes) %>%
+  select(Pathway, Subpathway, shared, KO, name) %>%
+  merge(VIP.kegg, by.x = "KO", by.y = "Query")
+#7 genes
+
+#add column for linear regression
+cue.ring.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, VIP.ring.deg.genes, Timepoint, Moisture) 
+
+cue.ring.deg.sum <- cue.ring.deg %>%
+  gather(key = "Energy_central", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.ring.deg.subset <- cue.ring.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+#sum of aromatic ring degradation genes
+cor <- as.matrix(cor(y=cue.ring.deg.sum$CUE.metric.log, x = cue.ring.deg.sum$sum.vst)) #0.49
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.ring.deg.sum)) #0.0017
+
+cue.ring.deg.sum$Timepoint <- factor(cue.ring.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.ring.deg.sum$Moisture <- factor(cue.ring.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.ring.deg.sum)
+
+print(p)
+ggsave(paste("../figures/FigsS4-PLSR/10/aromatic-ring-degradation-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/aromatic-ring-degradation-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+########Sum of Paul's degradation geens
+deg <- rbind(aa.deg.Paul.VIP, nuc.deg.Paul.VIP, aro.deg.Paul.VIP, ring.deg.Paul.VIP)
+
+deg.genes = deg$KO
+
+Paul.deg.kegg <- VIP.kegg %>%
+  filter(Query %in% deg.genes) 
+#32 genes
+
+#add column for linear regression
+cue.deg <- cue.timepoint %>%
+  mutate(group = "group") %>%
+  dplyr::select(SampleID, CUE.metric.log, deg.genes, Timepoint, Moisture) 
+
+cue.deg.sum <- cue.deg %>%
+  gather(key = "energy", value = "VST", -CUE.metric.log, -SampleID, -Timepoint, -Moisture) %>%
+  group_by(SampleID, Timepoint, Moisture) %>%
+  summarise(sum.vst = sum(VST), CUE.metric.log = mean(CUE.metric.log))
+
+
+cue.deg.subset <- cue.deg %>%
+  column_to_rownames(var = "SampleID") %>%
+  select(-c(Moisture, Timepoint))
+
+#sum of all degradation genes
+cor <- as.matrix(cor(y=cue.deg.sum$CUE.metric.log, x = cue.deg.sum$sum.vst)) #0.39
+cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.deg.sum)) #0.014
+
+cue.deg.sum$Timepoint <- factor(cue.deg.sum$Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168"))
+cue.deg.sum$Moisture <- factor(cue.deg.sum$Moisture, levels = c("x50", "x100"))
+
+p <- make_correlation_plots(cue.deg.sum)
+
+ggsave(paste("../figures/FigsS4-PLSR/10/deg-Paul-genes-single-regression.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste("../figures/FigsS4-PLSR/10/deg-Paul-genes-single-regression.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+
+```
+
+```{r create table of CGE and Pauls genes}
+##Biosynthesis
+aa.biosynthesis.merge <- aa.biosynthesis %>%
+  select(Biomolecule, KO) 
+
+lipid.biosynthesis.merge <- lipid.biosynthesis %>%
+  select(Biomolecule, KO)
+
+nuc.biosynthesis.merge <- nuc.biosynthesis %>%
+  select(Biomolecule, KO)
+
+eps.biosynthesis.merge <- eps.biosynthesis %>%
+  select(Biomolecule, KO)
+
+teich.biosynthesis.merge <- teich.biosynthesis %>%
+  select(Biomolecule, KO)
+
+wall.biosynthesis.merge <- wall.biosynthesis %>%
+  select(Biomolecule, KO) %>%
+  mutate(Biomolecule = "exopolysaccharides biosynthesis")
+
+biosynthesis <- rbind(aa.biosynthesis.merge, lipid.biosynthesis.merge, 
+                      nuc.biosynthesis.merge, eps.biosynthesis.merge,
+                      teich.biosynthesis.merge, wall.biosynthesis.merge) %>%
+  rename(Pathway = Biomolecule) %>%
+  mutate(Metabolism = "Biosynthesis") %>%
+  select(KO, Metabolism, Pathway)
+
+
+##Energy
+central.merge <- central %>%
+  select(KO, Metabolism, Shared, Shared2) %>%
+  unite(Metabolism, c("Metabolism", "Shared", "Shared2"), sep = "_") %>%
+  mutate(Metabolism2 = case_when(
+    grepl("Citrate cycle", Metabolism) ~ "Central C metabolism: TCA cycle",
+    grepl("Pentose", Metabolism) ~ "Central C metabolism: PPP",
+    grepl("Glycolysis", Metabolism) ~ "Central C metabolism: Glycolysis/Gluconeogenesis",
+    grepl("Pyruvate", Metabolism) ~ "Central C metabolism: Pyruvate oxidation",
+    grepl("Entner-Doudoroff pathway", Metabolism) ~ "Central C metabolism: ED pathway",
+    grepl("glyoxylate", Metabolism) ~ "Central C metabolism: Glyoxylate shunt and acetate consumption",
+    grepl("shared", Metabolism) & grepl("tca/glyc", Metabolism) ~ "Central C metabolism: TCA cycle and Glycolysis",
+    grepl("shared", Metabolism) & grepl("TCA/glyc", Metabolism) ~ "Central C metabolism: TCA cycle and Glycolysis",
+   grepl("shared", Metabolism) & grepl("glyc/ed", Metabolism) ~ "Central C metabolism: Glycolysis and ED pathway",
+  )) %>%
+  select(-Metabolism) %>%
+  rename(Pathway = Metabolism2) 
+
+atp.merge <- atp %>%
+  select(KO) %>%
+  mutate(Pathway = "ATPase")
+
+pomp.merge <- pomp %>%
+  unite(Pathway, c(Metabolism, Shared2), sep = ": ") %>%
+  select(KO, Pathway)
+  
+
+ferm.merge <- ferm %>%
+  mutate(Shared = case_when(
+    Shared == "shared" ~ paste("to", Shared2, sep = " "),
+    TRUE ~ Shared)) %>%
+  mutate(Pathway = "Fermentation") %>%
+  unite(Pathway, c(Pathway, Shared), sep = ": ") %>%
+  select(KO, Pathway)
+
+pyrox.merge <- pyrox %>%
+  mutate(Pathway = "Pyruvate oxidation") %>%
+  select(KO, Pathway)
+
+etc.merge <- etc %>%
+  mutate(Pathway = "Electron transport chain") %>%
+  select(KO, Pathway)
+
+energy <- rbind(central.merge, atp.merge, 
+                      pomp.merge, ferm.merge,
+                      etc.merge) %>%
+  mutate(Metabolism = "Energy") %>%
+  select(KO, Metabolism, Pathway)
+
+##Degradation
+aro.deg.merge <- aro.deg %>%
+  mutate(Pathway = "Xenobiotics degradation") %>%
+  select(KO, Pathway)
+
+ring.deg.merge <- ring.deg %>%
+  mutate(Pathway = "Aromatic ring degradation") %>%
+  select(KO, Pathway)
+
+nuc.deg.merge <- nuc.deg %>%
+  mutate(Pathway = case_when(
+    grepl("purine", Subpathway) ~ "Nucleotide degradation: purine",
+    grepl("pyrimidine", Subpathway) ~ "Nucleotide degradation: pyrimidine"
+  )) %>%
+  select(KO, Pathway)
+
+lipid.deg.merge <- lipid.deg %>%
+  mutate(Pathway = "Lipid degradation") %>%
+  select(KO, Pathway)
+
+aa.deg.merge <- aa.deg %>%
+  mutate(Pathway = "Amino acid degradation") %>%
+  select(KO, Pathway)
+
+degradation <- rbind(aro.deg.merge, nuc.deg.merge, ring.deg.merge, lipid.deg.merge, aa.deg.merge) %>%
+  mutate(Metabolism = "Degradation") %>%
+  select(KO, Metabolism, Pathway)
+
+##All Paul's pathways
+all.pathways <- rbind(biosynthesis, energy, degradation)
+  
+
+
+#merge VIP scores with KEGG classifications and components
+VIP.kegg.2 <- VIP %>%
+  rownames_to_column(var = "Query") %>%
+  merge(load.df, by = "Query", all.x= TRUE) %>%
+  merge(kegg.brite, by.x = "Query", by.y = "KO", all.x = TRUE) %>%
+  drop_na(Comp1) %>%
+  mutate(Comp1 = as.numeric(Comp1)) %>%
+  mutate(VIP.sign = case_when(
+    Comp1 > 0 ~ VIP,
+    Comp1 < 0 ~ -VIP
+  )) %>%
+    distinct() %>%
+  arrange(desc(VIP.sign)) %>%
+  mutate(Query = fct_reorder(Query, VIP.sign)) %>%
+  rename(KO = Query) %>%
+  merge(all.pathways, by = "KO", all.x = TRUE) %>%
+  select(KO, VIP, Comp1, Metabolism, Pathway, Level1, Level2, Level3, Level4)
+  
+ 
+
+VIP.kegg
+write.csv(VIP.kegg, "../output/PLSR/TableS1-10.csv")
+```
+
+

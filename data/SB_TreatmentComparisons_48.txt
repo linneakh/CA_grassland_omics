@@ -1,0 +1,2 @@
+comparisonID	iso.compare	trt.code.1	trt.code.2	trt.refs	days	notes
+3	18O	t3_16O; t24_16O; t48_16O; t72_16O; t168_16O	t48_18O	t3_16O; t24_16O; t48_16O; t72_16O; t168_16O	2	NA

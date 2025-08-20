@@ -1,0 +1,98 @@
+Metabolism,Shared,Shared2,KO,Name
+anaerobic metabolism,to alcohol,2,k00001,"E1.1.1.1, adh; alcohol dehydrogenase [EC:1.1.1.1]"
+anaerobic metabolism,to alcohol,2,k00002,"AKR1A1, adh; alcohol dehydrogenase (NADP+) [EC:1.1.1.2]"
+anaerobic metabolism,to butyrate,3,k00004,"BDH, butB; (R,R)-butanediol dehydrogenase / meso-butanediol dehydrogenase / diacetyl reductase [EC:1.1.1.4 1.1.1.- 1.1.1.303]"
+anaerobic metabolism,to lactate,,k00016,"LDH, ldh; L-lactate dehydrogenase [EC:1.1.1.27]"
+anaerobic metabolism,to butyrate,1,k00022,HADH; 3-hydroxyacyl-CoA dehydrogenase [EC:1.1.1.35]
+anaerobic metabolism,to butyrate,1a,k00023,phbB; acetoacetyl-CoA reductase [EC:1.1.1.36]
+anaerobic metabolism,to butyrate,1,k00074,"paaH, hbd, fadB, mmgB; 3-hydroxybutyryl-CoA dehydrogenase [EC:1.1.1.157]"
+anaerobic metabolism,to butanol,,k00100,bdhAB; butanol dehydrogenase [EC:1.1.1.-]
+anaerobic metabolism,to alcohol,2,k00114,exaA; alcohol dehydrogenase (cytochrome c) [EC:1.1.2.8]
+anaerobic metabolism,to alcohol,2,k00121,"frmA, ADH5, adhC; S-(hydroxymethyl)glutathione dehydrogenase / alcohol dehydrogenase [EC:1.1.1.284 1.1.1.1]"
+anaerobic metabolism,to acetate,4,k00128,ALDH; aldehyde dehydrogenase (NAD+) [EC:1.2.1.3]
+anaerobic metabolism,shared,acetate/butanol,k00132,E1.2.1.10; acetaldehyde dehydrogenase (acetylating) [EC:1.2.1.10]
+anaerobic metabolism,to acetate,4,k00138,aldB; aldehyde dehydrogenase [EC:1.2.1.-]
+anaerobic metabolism,to acetate,4,k00149,ALDH9A1; aldehyde dehydrogenase family 9 member A1 [EC:1.2.1.47 1.2.1.3]
+anaerobic metabolism,to butyrate,3,k00209,"fabV, ter; enoyl-[acyl-carrier protein] reductase / trans-2-enoyl-CoA reductase (NAD+) [EC:1.3.1.9 1.3.1.44]"
+anaerobic metabolism,to propionate,3,k00232,"E1.3.3.6, ACOX1, ACOX3; acyl-CoA oxidase [EC:1.3.3.6]"
+anaerobic metabolism,to propionate,3,k00248,"ACADS, bcd; butyryl-CoA dehydrogenase [EC:1.3.8.1]"
+anaerobic metabolism,shared,acetate/propionate,k00625,"E2.3.1.8, pta; phosphate acetyltransferase [EC:2.3.1.8]"
+anaerobic metabolism,to butyrate,3,k00634,ptb; phosphate butyryltransferase [EC:2.3.1.19]
+anaerobic metabolism,shared,acetate/propionate,k00925,ackA; acetate kinase [EC:2.7.2.1]
+anaerobic metabolism,to butyrate,3,k00929,buk; butyrate kinase [EC:2.7.2.7]
+anaerobic metabolism,to propionate,4,k00932,tdcD; propionate kinase [EC:2.7.2.15]
+anaerobic metabolism,shared,acetate/propionate,k01026,pct; propionate CoA-transferase [EC:2.8.3.1]
+anaerobic metabolism,to acetone,,k01027,OXCT; 3-oxoacid CoA-transferase [EC:2.8.3.5]
+anaerobic metabolism,to acetone,,k01028,"E2.8.3.5A, scoA; 3-oxoacid CoA-transferase subunit A [EC:2.8.3.5]"
+anaerobic metabolism,to acetone,,k01029,"E2.8.3.5B, scoB; 3-oxoacid CoA-transferase subunit B [EC:2.8.3.5]"
+anaerobic metabolism,shared,butyrate/acetone,k01034,atoD; acetate CoA/acetoacetate CoA-transferase alpha subunit [EC:2.8.3.8 2.8.3.9]
+anaerobic metabolism,shared,butyrate/acetone,k01035,atoA; acetate CoA/acetoacetate CoA-transferase beta subunit [EC:2.8.3.8 2.8.3.9]
+anaerobic metabolism,to acetate,1,k01067,"E3.1.2.1, ACH1; acetyl-CoA hydrolase [EC:3.1.2.1]"
+anaerobic metabolism,to acetate,6,k01512,acyP; acylphosphatase [EC:3.6.1.7]
+anaerobic metabolism,to alcohol,1,k01568,"PDC, pdc; pyruvate decarboxylase [EC:4.1.1.1]"
+anaerobic metabolism,to acetone,,k01574,adc; acetoacetate decarboxylase [EC:4.1.1.4]
+anaerobic metabolism,shared,butyrate/propionate,k01692,"paaF, echA; enoyl-CoA hydratase [EC:4.2.1.17]"
+anaerobic metabolism,to butyrate,2,k01715,crt; enoyl-CoA hydratase [EC:4.2.1.17]
+anaerobic metabolism,shared,butyrate/propionate,k01782,fadJ; 3-hydroxyacyl-CoA dehydrogenase / enoyl-CoA hydratase / 3-hydroxybutyryl-CoA epimerase [EC:1.1.1.35 4.2.1.17 5.1.2.3]
+anaerobic metabolism,shared,butyrate/propionate,k01825,fadB; 3-hydroxyacyl-CoA dehydrogenase / enoyl-CoA hydratase / 3-hydroxybutyryl-CoA epimerase / enoyl-CoA isomerase [EC:1.1.1.35 4.2.1.17 5.1.2.3 5.3.3.8]
+anaerobic metabolism,shared,acetate/propionate,k01895,"ACSS1_2, acs; acetyl-CoA synthetase [EC:6.2.1.1]"
+"aerobic consumption, irreversable",,,k01896,ACSM; medium-chain acyl-CoA synthetase [EC:6.2.1.2]
+anaerobic metabolism,shared,acetate/propionate,k01905,acdA; acetate---CoA ligase (ADP-forming) subunit alpha [EC:6.2.1.13]
+anaerobic metabolism,to propionate,6,k01908,"ACSS3, prpE; propionyl-CoA synthetase [EC:6.2.1.17]"
+anaerobic metabolism,to acetate,3,k01913,
+anaerobic metabolism,to propionate,1,k01946,ACACB; acetyl-CoA carboxylase / biotin carboxylase 2 [EC:6.4.1.2 6.3.4.14 2.1.3.15]
+anaerobic metabolism,to propionate,1,k01961,"accC; acetyl-CoA carboxylase, biotin carboxylase subunit [EC:6.4.1.2 6.3.4.14]"
+anaerobic metabolism,to propionate,1,k01962,accA; acetyl-CoA carboxylase carboxyl transferase subunit alpha [EC:6.4.1.2 2.1.3.15]
+anaerobic metabolism,to propionate,1,k01963,accD; acetyl-CoA carboxylase carboxyl transferase subunit beta [EC:6.4.1.2 2.1.3.15]
+anaerobic metabolism,to propionate,1,k01964,K01964; acetyl-CoA/propionyl-CoA carboxylase [EC:6.4.1.2 6.4.1.3]
+anaerobic metabolism,to propionate,1,k02160,"accB, bccP; acetyl-CoA carboxylase biotin carboxyl carrier protein"
+anaerobic metabolism,to propionate,1,k03416,E2.1.3.1-5S; methylmalonyl-CoA carboxyltransferase 5S subunit [EC:2.1.3.1]
+anaerobic metabolism,to acetate,5,k04020,eutD; phosphotransacetylase
+anaerobic metabolism,to acetate,4,k04021,eutE; aldehyde dehydrogenase
+anaerobic metabolism,to alcohol,2,k04022,eutG; alcohol dehydrogenase
+anaerobic metabolism,shared,acetate/alcohol/butanol,k04072,adhE; acetaldehyde dehydrogenase / alcohol dehydrogenase [EC:1.2.1.10 1.1.1.1]
+anaerobic metabolism,shared,acetate/butanol,k04073,mhpF; acetaldehyde dehydrogenase [EC:1.2.1.10]
+anaerobic metabolism,to propionate,2,k05606,"MCEE, epi; methylmalonyl-CoA/ethylmalonyl-CoA epimerase [EC:5.1.99.1]"
+anaerobic metabolism,shared,butyrate/propionate,k07511,ECHS1; enoyl-CoA hydratase [EC:4.2.1.17]
+anaerobic metabolism,shared,butyrate/propionate,k07514,"EHHADH; enoyl-CoA hydratase / 3-hydroxyacyl-CoA dehydrogenase / 3,2-trans-enoyl-CoA isomerase [EC:4.2.1.17 1.1.1.35 5.3.3.8]"
+anaerobic metabolism,shared,butyrate/propionate,k07515,HADHA; enoyl-CoA hydratase / long-chain 3-hydroxyacyl-CoA dehydrogenase [EC:4.2.1.17 1.1.1.211]
+anaerobic metabolism,to butyrate,1,k07516,fadN; 3-hydroxyacyl-CoA dehydrogenase [EC:1.1.1.35]
+anaerobic metabolism,to propionate,1,k11262,ACACA; acetyl-CoA carboxylase / biotin carboxylase 1 [EC:6.4.1.2 6.3.4.14 2.1.3.15]
+anaerobic metabolism,to propionate,1,k11263,"bccA, pccA; acetyl-CoA/propionyl-CoA carboxylase, biotin carboxylase, biotin carboxyl carrier protein [EC:6.4.1.2 6.4.1.3 6.3.4.14]"
+anaerobic metabolism,to alcohol,2,k12957,yjgB; uncharacterized zinc-type alcohol dehydrogenase-like protein [EC:1.-.-.-]
+anaerobic metabolism,shared,acetate/propionate,k13788,pta; phosphate acetyltransferase [EC:2.3.1.8]
+anaerobic metabolism,to propionate,4,k13923,pduL; phosphate propanoyltransferase [EC:2.3.1.222]
+anaerobic metabolism,to alcohol,2,k13951,ADH1_7; alcohol dehydrogenase 1/7 [EC:1.1.1.1]
+anaerobic metabolism,to alcohol,2,k13952,ADH6; alcohol dehydrogenase 6 [EC:1.1.1.1]
+anaerobic metabolism,to alcohol,2,k13953,"adhP; alcohol dehydrogenase, propanol-preferring [EC:1.1.1.1]"
+anaerobic metabolism,to alcohol,2,k13954,yiaY; alcohol dehydrogenase [EC:1.1.1.1]
+anaerobic metabolism,to alcohol,2,k13979,yahK; uncharacterized zinc-type alcohol dehydrogenase-like protein [EC:1.-.-.-]
+anaerobic metabolism,to alcohol,2,k13980,ADH4; alcohol dehydrogenase 4 [EC:1.1.1.1]
+anaerobic metabolism,to alcohol,2,k14028,"mdh1, mxaF; methanol dehydrogenase (cytochrome c) subunit 1 [EC:1.1.2.7]"
+anaerobic metabolism,to alcohol,2,k14029,"mdh2, mxaI; methanol dehydrogenase (cytochrome c) subunit 2 [EC:1.1.2.7]"
+anaerobic metabolism,to acetate,4,k14085,ALDH7A1; aldehyde dehydrogenase family 7 member A1 [EC:1.2.1.31 1.2.1.8 1.2.1.3]
+anaerobic metabolism,to propionate,2,k14468,mcr; malonyl-CoA reductase / 3-hydroxypropionate dehydrogenase (NADP+) [EC:1.2.1.75 1.1.1.298]
+anaerobic metabolism,to propionate,2,k14729,FOX2; multifunctional beta-oxidation protein [EC:4.2.1.- 1.1.1.-]
+anaerobic metabolism,shared,acetate/propionate,k15024,K15024; putative phosphotransacetylase [EC:2.3.1.8]
+anaerobic metabolism,to propionate,1,k15036,K15036; acetyl-CoA/propionyl-CoA carboxylase [EC:6.4.1.2 6.4.1.3 2.1.3.15]
+anaerobic metabolism,to propionate,1,k15037,K15037; biotin carboxyl carrier protein
+anaerobic metabolism,to propionate,1,k17489,E2.1.3.1-12S; methylmalonyl-CoA carboxyltransferase 12S subunit [EC:2.1.3.1]
+anaerobic metabolism,to propionate,1,k17490,E2.1.3.1-1.3S; methylmalonyl-CoA carboxyltransferase 1.3S subunit [EC:2.1.3.1]
+anaerobic metabolism,to butyrate,3,k17829,ccrA; crotonyl-CoA reductase [EC:1.3.1.86]
+anaerobic metabolism,to butyrate,2a,k17865,croR; 3-hydroxybutyryl-CoA dehydratase [EC:4.2.1.55]
+anaerobic metabolism,to acetate,2,k18118,"aarC, cat1; succinyl-CoA:acetate CoA-transferase [EC:2.8.3.18]"
+anaerobic metabolism,shared,acetate/butanol,k18366,"bphJ, xylQ, nahO, tesF; acetaldehyde/propanal dehydrogenase [EC:1.2.1.10 1.2.1.87]"
+anaerobic metabolism,to propionate,1,k18472,accD6; acetyl-CoA/propionyl-CoA carboxylase carboxyl transferase subunit [EC:6.4.1.2 6.4.1.3 2.1.3.15]
+anaerobic metabolism,to alcohol,2,k18857,ADH1; alcohol dehydrogenase class-P [EC:1.1.1.1]
+anaerobic metabolism,to propionate,1,k19312,pccB; acetyl-CoA/propionyl-CoA carboxylase carboxyl transferase subunit [EC:6.4.1.2 6.4.1.3 2.1.3.15]
+anaerobic metabolism,to propionate,4,k19697,pduW; propionate kinase [EC:2.7.2.15]
+anaerobic metabolism,shared,butyrate/acetone,k19709,ydiF; acetate CoA-transferase [EC:2.8.3.8]
+anaerobic metabolism,to propionate,3,k19745,acuI; acrylyl-CoA reductase (NADPH) [EC:1.3.1.-]
+anaerobic metabolism,to propionate,3,k20143,acrC; acrylyl-CoA reductase (NADH) [EC:1.3.1.95]
+anaerobic metabolism,shared,acetate/propionate,k22224,acdB; acetate---CoA ligase (ADP-forming) subunit beta [EC:6.2.1.13]
+"aerobic consumption, irreversable",from alcohol,,k22473,"adhA; alcohol dehydrogenase (quinone), dehydrogenase subunit [EC:1.1.5.5]"
+"aerobic consumption, irreversable",from alcohol,,k22474,"adhB; alcohol dehydrogenase (quinone), cytochrome c subunit [EC:1.1.5.5]"
+anaerobic metabolism,to propionate,1,k22568,"pccX; acetyl-CoA/propionyl-CoA carboxylase, PccX subunit [EC:6.4.1.2 6.4.1.3]"
+anaerobic metabolism,to propionate,2,k23146,HPD1; 3-hydroxypropionate dehydrogenase [EC:1.1.1.59]
+"aerobic consumption, irreversable",from butyrate,,k23756,"ACSM1, LAE; medium-chain acyl-CoA ligase / lipoate-activating enzyme [EC:6.2.1.2]"
+anaerobic metabolism,shared,acetate/propionate,k24012,

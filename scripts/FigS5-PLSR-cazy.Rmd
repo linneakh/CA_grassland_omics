@@ -1,0 +1,280 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.retina = 2)
+
+# Core
+library(tidyverse)
+library(ggplot2)
+library(pls)
+library(plsVarSel)
+
+# Extras
+library(viridis)
+library(viridisLite)
+library(patchwork)
+library(WGCNA)   # for corPvalueStudent
+library(grid)    # for unit()
+
+set.seed(123)
+# Aesthetics ---------------------------------------------------------------
+shapes_moisture <- c(x50 = 17, x100 = 16)
+
+
+
+fill = c("purple","blue4", "blue", "#278BF5","#7D86F0","#a6a8d0", "#e1e2ef","#6D2E1E", "#9B3D26","#b15e14","orange3", "#f2ceae",   "#00441B","#1B7837","#78C679", "#aaefaa")
+         
+
+source("../scripts/PLSR-functions.R")
+
+out_dir = "../figures/Fig6-PLSR/"
+out_dir_deg = "../figures/FigS6-PLSR/"
+
+r = 300
+w = 3.25
+h = 3
+w2 = 4
+
+
+
+```
+
+# Data import & preparation
+```{r import data}
+# CGE (CUE)
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+
+# Gene expression (VST, cazy-level)
+datExpr.0b <- read.csv("../output/metaT/vst-cazy-no-t0.csv", header = TRUE)
+datExpr <- datExpr.0b %>% tibble::column_to_rownames(var = "X") %>% mutate(across(everything(), as.numeric)) 
+  
+
+# Merge cue + expression
+datExpr.cue <- datExpr %>% t() %>% as.data.frame() %>% tibble::rownames_to_column("SampleID")
+cue.all <- cue.only %>%
+  merge(datExpr.cue, by = "SampleID") %>%
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  dplyr::select(-Plot, -Moisture, -Timepoint) %>%
+  tibble::column_to_rownames("SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  dplyr::select(-CUE.metric)
+
+cue.timepoint <- cue.all %>% 
+  tibble::rownames_to_column("SampleID") %>% 
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE)
+
+```
+
+
+
+
+
+#PLSR and VIP selection
+```{r plsr-vip, message=FALSE, warning=FALSE}
+# Fit model (uses cue.all created earlier in your workflow)
+m_full <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, validation = "LOO")
+m1     <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, ncomp = 1)
+
+# Helper to clean cazy names
+.clean_cazy <- function(x) gsub("[`']", "", x)
+
+# VIP (all cazy)
+VIP_df <- VIP(m1, opt.comp = 1) %>%
+  as.data.frame() %>%
+  setNames("VIP") %>%
+  rownames_to_column("cazy") %>%
+  mutate(cazy = .clean_cazy(cazy))
+
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+p_df <- as.data.frame(m1$loadings) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .}
+rownames(p_df) <- VIP_df$cazy
+
+p_df <- p_df %>%
+  rownames_to_column("cazy") %>%
+  mutate(cazy = .clean_cazy(cazy)) %>%
+  { 
+    num_cols <- setdiff(names(.), "cazy")
+    if (length(num_cols) == 0) tibble(cazy = .$cazy, P1 = NA_real_) else transmute(., cazy, P1 = .data[[num_cols[1]]])
+  }
+
+w_df <- as.data.frame(m1$loading.weights) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .} 
+
+rownames(w_df) <- VIP_df$cazy
+
+w_df <- w_df %>%
+  rownames_to_column("cazy") %>%
+  mutate(cazy = .clean_cazy(cazy)) %>%
+  { 
+    num_cols <- setdiff(names(.), "cazy")
+    if (length(num_cols) == 0) tibble(cazy = .$cazy, W1 = NA_real_) else transmute(., cazy, W1 = .data[[num_cols[1]]])
+  }
+
+q1 <- as.numeric(m1$Yloadings[1,1])
+
+b_vec <- as.vector(coef(m1)[,,1])
+cazy_b  <- names(coef(m1)[,,1])
+b_df  <- tibble(cazy = .clean_cazy(cazy_b), coef = as.numeric(b_vec))
+
+
+# Merge everything and compute a "proper" signed VIP using sign(W1 * q1)
+VIP_all <- VIP_df %>%
+  merge(p_df, by = "cazy") %>%
+  merge(w_df, by = "cazy") %>%
+  merge(b_df, by = "cazy") %>%
+  mutate(
+    q1        = q1,
+    sign_eff  = dplyr::case_when(is.na(W1) | is.na(q1) ~ 1,
+                                 TRUE ~ sign(W1 * q1)),
+    VIP_signed = VIP * sign_eff
+  )
+
+
+
+colnames(VIP_all)[3:4] <- c("loading_comp1", "weight_comp1")
+
+# Top 10% threshold and vector of cazy (still based on magnitude of VIP)
+q_90    <- quantile(VIP_all$VIP, probs = 0.9, na.rm = TRUE)
+VIP_top <- VIP_all %>% filter(VIP > q_90)
+
+vip_cazy <- VIP_top$cazy
+
+#prepare to make table S2
+VIP_top_final <- VIP_top %>%
+  select(cazy, VIP, coef, VIP_signed)
+
+# (Optional) inspect
+# head(VIP_all)
+# head(VIP_top)
+# Example: percent variance explained (printed in console)
+# summary(m_full)
+```
+
+
+
+
+```{r}
+#create columns for cazy classificaitons
+
+VIP.cazy <- VIP_top_final %>%
+  mutate(class = case_when(
+    startsWith(cazy, "GT") ~ "GT",
+    startsWith(cazy, "PL") ~ "PL",
+    startsWith(cazy, "GH") ~ "GH",
+    startsWith(cazy, "CBM") ~ "CBM",
+    startsWith(cazy, "CE") ~ "CE",
+    startsWith(cazy, "AA") ~ "AA"
+  ))
+  
+
+
+write.csv(VIP.cazy, "../output/PLSR/VIP_cazy_top_10.csv")
+
+```
+
+
+
+
+
+
+```{r plot all cazy and lc-ms VIPs and comp}
+
+#add categories to VIP list and reload
+
+VIP.cazy <- read.csv("../output/PLSR/VIP_cazy_top_10_cat.csv") %>% select(-X) 
+
+VIP.cazy.cat <- VIP.cazy %>%
+  arrange(desc(VIP_signed)) %>%
+  separate(cazy, c("cazy_id"), sep = " ", remove = FALSE) %>%
+  mutate(cazy_id, fct_reorder(cazy_id, VIP_signed)) %>%
+  unite(source_substrate, c("source", "substrate_2"), remove = FALSE) %>%
+  unite(finale, c("source", "category"), remove = FALSE) %>%
+  unite(substrate_category, c( "substrate_2", "category"), sep = " ", remove = FALSE) %>%
+  mutate(substrate_category = case_when(
+    substrate_2 == "glycans" & category == "biosynthesis" ~ str_replace(substrate_category, "biosynthesis", "(B)"),
+    substrate_2 == "glycans" & category == "degradation" ~ str_replace(substrate_category, "degradation", "(D)"),
+    substrate_2 != "glycans" & category == "biosynthesis" ~ str_replace(substrate_category, "biosynthesis", "(B)"),
+    substrate_2 != "glycans" & category == "degradation" ~ str_replace(substrate_category, "degradation", "(D)") )) 
+  
+
+
+VIP.cazy.cat$substrate_category <- factor(VIP.cazy.cat$substrate_category, levels = c("heparin (D)", "glycolipids (B)", "glycans (B)",
+                                                                              "mannans (D)", "chitosan (D)", "alginate (D)",  
+                                                                              "galactofuranose (D)",   "glucans (D)",       
+                                                              "trehalose (D)", "galactans (D)", "lactose (D)", "glycans (D)", "arabinans (D)","pectin (D)", 
+                                                              "glucuronoxylans (D)", "xylans (D)"))
+#plot VIP scores and color based on class_substrate
+plot <- ggplot(VIP.cazy.cat, aes(x=factor(cazy_id, levels = unique(cazy_id)), y = VIP_signed, fill = substrate_category)) +
+  geom_hline(yintercept = 1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_hline(yintercept = -1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "CAZy ID", y = "VIP score", fill = "Category") +
+  scale_fill_manual(values = c(fill)) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.8) +  
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+plot
+ggsave("../figures/FigS5-PLSR/VIP-cazy-top-10-per-substrate.png", width = 10, height = 7, dpi = 300, units = "in")
+ggsave("../figures/FigS5-PLSR/VIP-cazy-top-10-per-substrate.pdf", width = 10, height = 7, dpi = 300, units = "in")
+
+
+
+```
+
+summarise total sum of expression of cazy genes negatively and positively associated with CGE metric
+```{r}
+VIP.summary <- datExpr %>%
+  rownames_to_column(var = "cazy") %>%
+  # separate(cazy, c("cazy", "other"), sep = " ") %>%
+  # select(-other) %>%
+  merge(VIP.cazy, by = "cazy") %>%
+  mutate(direction = case_when(
+    VIP_signed >0 ~ "positive",
+    VIP_signed <0 ~ "negative"
+  )) %>%
+  gather(key = "SampleID", value = "VST", -c(cazy, VIP, coef, VIP_signed, class, direction)) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  mutate(VST = as.numeric(VST))
+  
+
+
+#all rewet time points
+m <- lmer(VST ~ direction * Moisture  + (1|Plot), data = VIP.summary)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                     Sum Sq Mean Sq NumDF DenDF  F value  Pr(>F)    
+# direction          1014.33 1014.33     1  1010 358.8765 < 2e-16 ***
+# Moisture              0.63    0.63     1  1010   0.2213 0.63812    
+# direction:Moisture   15.37   15.37     1  1010   5.4367 0.01991 *  
+
+plot.summary <- VIP.summary %>%
+  ggplot(aes(x=direction, y = VST)) +
+  geom_boxplot() +
+  theme_bw()
+
+summary <- VIP.summary %>% 
+  mutate(VST = as.numeric(VST)) %>%
+  filter(!is.na(VST)) %>%
+  mutate(direction = factor(direction, levels = c("negative", "positive"))) %>%
+  group_by(direction) %>% 
+  summarise(mean = mean(VST),
+            sd = sd(VST))
+
+
+
+```
+

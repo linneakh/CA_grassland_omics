@@ -1,0 +1,123 @@
+Biomolecule,Shared,Shared2,KO,name
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00059,"fabG, OAR1; 3-oxoacyl-[acyl-carrier protein] reductase [EC:1.1.1.100]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00208,fabI; enoyl-[acyl-carrier protein] reductase I [EC:1.3.1.9 1.3.1.10]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00209,"fabV, ter; enoyl-[acyl-carrier protein] reductase / trans-2-enoyl-CoA reductase (NAD+) [EC:1.3.1.9 1.3.1.44]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00645,"fabD, MCAT, MCT1; [acyl-carrier-protein] S-malonyltransferase [EC:2.3.1.39]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00647,fabB; 3-oxoacyl-[acyl-carrier-protein] synthase I [EC:2.3.1.41]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00648,fabH; 3-oxoacyl-[acyl-carrier-protein] synthase III [EC:2.3.1.180]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00665,"FASN; fatty acid synthase, animal type [EC:2.3.1.85]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00667,"FAS2; fatty acid synthase subunit alpha, fungi type [EC:2.3.1.86]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K00668,"FAS1; fatty acid synthase subunit beta, fungi type [EC:2.3.1.86]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01716,fabA; 3-hydroxyacyl-[acyl-carrier protein] dehydratase / trans-2-decenoyl-[acyl-carrier protein] isomerase [EC:4.2.1.59 5.3.3.14]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01961,"accC; acetyl-CoA carboxylase, biotin carboxylase subunit [EC:6.4.1.2 6.3.4.14]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01962,accA; acetyl-CoA carboxylase carboxyl transferase subunit alpha [EC:6.4.1.2 2.1.3.15]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01963,accD; acetyl-CoA carboxylase carboxyl transferase subunit beta [EC:6.4.1.2 2.1.3.15]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K02160,"accB, bccP; acetyl-CoA carboxylase biotin carboxyl carrier protein"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K02371,fabK; enoyl-[acyl-carrier protein] reductase II [EC:1.3.1.9]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K02372,fabZ; 3-hydroxyacyl-[acyl-carrier-protein] dehydratase [EC:4.2.1.59]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K07512,"MECR, NRBF1; mitochondrial enoyl-[acyl-carrier protein] reductase / trans-2-enoyl-CoA reductase [EC:1.3.1.- 1.3.1.38]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K09458,"fabF, OXSM, CEM1; 3-oxoacyl-[acyl-carrier-protein] synthase II [EC:2.3.1.179]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K10780,fabL; enoyl-[acyl-carrier protein] reductase III [EC:1.3.1.104]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K11263,"bccA, pccA; acetyl-CoA/propionyl-CoA carboxylase, biotin carboxylase, biotin carboxyl carrier protein [EC:6.4.1.2 6.4.1.3 6.3.4.14]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K11533,"fas; fatty acid synthase, bacteria type [EC:2.3.1.-]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K16363,lpxC-fabZ; UDP-3-O-[3-hydroxymyristoyl] N-acetylglucosamine deacetylase / 3-hydroxyacyl-[acyl-carrier-protein] dehydratase [EC:3.5.1.108 4.2.1.59]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K18472,accD6; acetyl-CoA/propionyl-CoA carboxylase carboxyl transferase subunit [EC:6.4.1.2 6.4.1.3 2.1.3.15]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K18473,fabY; acetoacetyl-[acyl-carrier protein] synthase [EC:2.3.1.180]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K11262,ACACA; acetyl-CoA carboxylase / biotin carboxylase 1 [EC:6.4.1.2 6.3.4.14 2.1.3.15]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01946,ACACB; acetyl-CoA carboxylase / biotin carboxylase 2 [EC:6.4.1.2 6.3.4.14 2.1.3.15]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K11539,CBR4; carbonyl reductase 4 / 3-oxoacyl-[acyl-carrier protein] reductase beta subunit [EC:1.1.1.-]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K13370,HSD17B8; 17beta-estradiol 17-dehydrogenase / 3alpha(17beta)-hydroxysteroid dehydrogenase (NAD+) / 3-oxoacyl-[acyl-carrier protein] reductase alpha subunit [EC:1.1.1.62 1.1.1.239]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K22540,"HTD2; 3-hydroxyacyl-thioester dehydratase, animal type [EC:4.2.1.-]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K22541,"HTD2; 3-hydroxyacyl-thioester dehydratase, fungi type [EC:4.2.1.-]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01071,MCH; medium-chain acyl-[acyl-carrier-protein] hydrolase [EC:3.1.2.21]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K10781,FATB; fatty acyl-ACP thioesterase B [EC:3.1.2.14 3.1.2.21]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K18474,fabM; trans-2-decenoyl-[acyl-carrier protein] isomerase [EC:5.3.3.14]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K01897,"ACSL, fadD; long-chain acyl-CoA synthetase [EC:6.2.1.3]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K15013,ACSBG; long-chain-fatty-acid--CoA ligase ACSBG [EC:6.2.1.3]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K03921,"FAB2, SSI2, desA1; acyl-[acyl-carrier-protein] desaturase [EC:1.14.19.2 1.14.19.11 1.14.19.26]"
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K03922,desA2; acyl-[acyl-carrier-protein] desaturase [EC:1.14.19.2]
+lipid biosynthesis,"Fatty acid biosynthesis, elongation",from acetyl-CoA and malonyl-CoA to steroyl-CoA and hexadecanoyl-CoA,K10782,FATA; fatty acyl-ACP thioesterase A [EC:3.1.2.14]
+lipid biosynthesis,glycerol-3P production,,K00002,"AKR1A1, adh; alcohol dehydrogenase (NADP+) [EC:1.1.1.2]"
+lipid biosynthesis,glycerol-3P production,,K00005,gldA; glycerol dehydrogenase [EC:1.1.1.6]
+lipid biosynthesis,glycerol-3P production,,K00006,GPD1; glycerol-3-phosphate dehydrogenase (NAD+) [EC:1.1.1.8]
+lipid biosynthesis,glycerol-3P production,,K00011,AKR1B; aldehyde reductase [EC:1.1.1.21]
+lipid biosynthesis,glycerol-3P production,,K00057,gpsA; glycerol-3-phosphate dehydrogenase (NAD(P)+) [EC:1.1.1.94]
+lipid biosynthesis,glycerol-3P production,,K00105,E1.1.3.21; alpha-glycerophosphate oxidase [EC:1.1.3.21]
+lipid biosynthesis,glycerol-3P production,,K00111,"glpA, glpD; glycerol-3-phosphate dehydrogenase [EC:1.1.5.3]"
+lipid biosynthesis,glycerol-3P production,,K00112,glpB; glycerol-3-phosphate dehydrogenase subunit B [EC:1.1.5.3]
+lipid biosynthesis,glycerol-3P production,,K00113,glpC; glycerol-3-phosphate dehydrogenase subunit C
+lipid biosynthesis,glycerol-3P production,,K00649,GNPAT; glyceronephosphate O-acyltransferase [EC:2.3.1.42]
+lipid biosynthesis,glycerol-3P production,,K00864,"glpK, GK; glycerol kinase [EC:2.7.1.30]"
+lipid biosynthesis,glycerol-3P production,,K13979,yahK; uncharacterized zinc-type alcohol dehydrogenase-like protein [EC:1.-.-.-]
+lipid biosynthesis,glycerol-3P production,,K18097,GCY1; glycerol 2-dehydrogenase (NADP+) [EC:1.1.1.156]
+lipid biosynthesis,glycerol-3P production,,K22251,golD; glycerol dehydrogenase [EC:1.1.1.6]
+lipid biosynthesis,glycerol-3P production,,K00863,"DAK, TKFC; triose/dihydroxyacetone kinase / FAD-AMP lyase (cyclizing) [EC:2.7.1.28 2.7.1.29 4.6.1.15]"
+lipid biosynthesis,glycerol-3P production,,K05878,dhaK; phosphoenolpyruvate---glycerone phosphotransferase subunit DhaK [EC:2.7.1.121]
+lipid biosynthesis,glycerol-3P production,,K05879,dhaL; phosphoenolpyruvate---glycerone phosphotransferase subunit DhaL [EC:2.7.1.121]
+lipid biosynthesis,glycerol-3P production,,K05881,dhaM; phosphoenolpyruvate---glycerone phosphotransferase subunit DhaM [EC:2.7.1.121]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K00631,plsB; glycerol-3-phosphate O-acyltransferase [EC:2.3.1.15]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K00655,plsC; 1-acyl-sn-glycerol-3-phosphate acyltransferase [EC:2.3.1.51]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K08591,plsY; acyl phosphate:glycerol-3-phosphate acyltransferase [EC:2.3.1.275]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13509,AGPAT1_2; lysophosphatidate acyltransferase [EC:2.3.1.51]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13513,"LCLAT1, AGPAT8; lysocardiolipin and lysophospholipid acyltransferase [EC:2.3.1.- 2.3.1.51]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13519,"LPT1, ALE1; lysophospholipid acyltransferase [EC:2.3.1.51 2.3.1.23 2.3.1.-]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K00629,GPAT1_2; glycerol-3-phosphate O-acyltransferase 1/2 [EC:2.3.1.15]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13506,"GPAT3_4, AGPAT9, AGPAT6; glycerol-3-phosphate O-acyltransferase 3/4 [EC:2.3.1.15]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K00630,ATS1; glycerol-3-phosphate O-acyltransferase [EC:2.3.1.15]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13508,GPAT; glycerol-3-phosphate acyltransferase [EC:2.3.1.15 2.3.1.198]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13523,AGPAT3_4; lysophosphatidic acid acyltransferase / lysophosphatidylinositol acyltransferase [EC:2.3.1.51 2.3.1.-]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K19007,AGPAT5; lysophosphatidiate acyltransferase [EC:2.3.1.51]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13517,MBOAT1_2; lysophospholipid acyltransferase 1/2 [EC:2.3.1.51 2.3.1.-]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K22831,LOA1; 1-acylglycerol-3-phosphate O-acyltransferase [EC:2.3.1.51]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K13507,GAT; glycerol-3-phosphate O-acyltransferase / dihydroxyacetone phosphate acyltransferase [EC:2.3.1.15 2.3.1.42]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to PA,K14674,TGL4; TAG lipase / steryl ester hydrolase / phospholipase A2 / LPA acyltransferase [EC:3.1.1.3 3.1.1.13 3.1.1.4 2.3.1.51]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K23736,PHM8; 2-lysophosphatidate phosphatase [EC:3.1.3.106]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K23737,E3.1.3.106; 2-lysophosphatidate phosphatase [EC:3.1.3.106]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K14457,"MOGAT2, MGAT2; 2-acylglycerol O-acyltransferase 2 [EC:2.3.1.22]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K14456,"MOGAT3, MGAT3; 2-acylglycerol O-acyltransferase 3 [EC:2.3.1.20 2.3.1.22]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K01080,PLPP1_2_3; phosphatidate phosphatase [EC:3.1.3.4]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K15728,LPIN; phosphatidate phosphatase LPIN [EC:3.1.3.4]
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to DAG,K18693,"DPP1, DPPL, PLPP4_5; diacylglycerol diphosphate phosphatase / phosphatidate phosphatase [EC:3.1.3.81 3.1.3.4]"
+lipid biosynthesis,"production of intermediates: phosphatidic acid (PA), diacyl glycerol (DAG), CDP-iacyl glycerol, ",to CDP-DAG,K00981,"E2.7.7.41, CDS1, CDS2, cdsA; phosphatidate cytidylyltransferase [EC:2.7.7.41]"
+lipid biosynthesis,main end products,triacyl glycerol,K00679,E2.3.1.158; phospholipid:diacylglycerol acyltransferase [EC:2.3.1.158]
+lipid biosynthesis,main end products,triacyl glycerol,K11155,DGAT1; diacylglycerol O-acyltransferase 1 [EC:2.3.1.20 2.3.1.75 2.3.1.76]
+lipid biosynthesis,main end products,triacyl glycerol,K11160,DGAT2; diacylglycerol O-acyltransferase 2 [EC:2.3.1.20 2.3.1.75]
+lipid biosynthesis,main end products,triacyl glycerol,K14456,"MOGAT3, MGAT3; 2-acylglycerol O-acyltransferase 3 [EC:2.3.1.20 2.3.1.22]"
+lipid biosynthesis,main end products,triacyl glycerol,K22848,"DGAT2; diacylglycerol O-acyltransferase 2, plant [EC:2.3.1.20]"
+lipid biosynthesis,main end products,triacyl glycerol,K22849,"DGAT3; diacylglycerol O-acyltransferase 3, plant [EC:2.3.1.20]"
+lipid biosynthesis,main end products,triacyl glycerol,K00635,"tgs, wax-dgat; diacylglycerol O-acyltransferase / wax synthase [EC:2.3.1.20 2.3.1.75]"
+lipid biosynthesis,main end products,triacyl glycerol,K18851,fbp; diacylglycerol O-acyltransferase / trehalose O-mycolyltransferase [EC:2.3.1.20 2.3.1.122]
+lipid biosynthesis,main end products,glycolipids,K19002,"mgs, bgsB; 1,2-diacylglycerol 3-alpha-glucosyltransferase [EC:2.4.1.337]"
+lipid biosynthesis,main end products,glycolipids,K19003,"mgdA; 1,2-diacylglycerol 3-beta-glucosyltransferase [EC:2.4.1.336]"
+lipid biosynthesis,main end products,glycolipids,K19004,"K19004; processive 1,2-diacylglycerol beta-glycosyltransferase [EC:2.4.1.315 2.4.1.-]"
+lipid biosynthesis,main end products,glycolipids,K19005,ltaS; lipoteichoic acid synthase [EC:2.7.8.20]
+lipid biosynthesis,main end products,glycolipids,K03429,"ugtP; processive 1,2-diacylglycerol beta-glucosyltransferase [EC:2.4.1.315]"
+lipid biosynthesis,main end products,glycolipids,K13677,"dgs, bgsA; 1,2-diacylglycerol-3-alpha-glucose alpha-1,2-glucosyltransferase [EC:2.4.1.208]"
+lipid biosynthesis,main end products,glycolipids,K20024,mgdE; monoglucosyldiacylglycerol epimerase [EC:5.1.3.34]
+lipid biosynthesis,main end products,glycolipids,K03715,"MGD; 1,2-diacylglycerol 3-beta-galactosyltransferase [EC:2.4.1.46]"
+lipid biosynthesis,main end products,glycolipids,K09480,DGD; digalactosyldiacylglycerol synthase [EC:2.4.1.241]
+lipid biosynthesis,main end products,glycolipids,K21362,SFR2; galactolipid galactosyltransferase [EC:2.4.1.184]
+lipid biosynthesis,main end products,phosphatidyl-inositol,K00999,CDIPT; CDP-diacylglycerol--inositol 3-phosphatidyltransferase [EC:2.7.8.11]
+lipid biosynthesis,main end products,phosphatidyl-glycerol,K00995,"pgsA, PGS1; CDP-diacylglycerol---glycerol-3-phosphate 3-phosphatidyltransferase [EC:2.7.8.5]"
+lipid biosynthesis,main end products,phosphatidyl-glycerol,K01094,GEP4; phosphatidylglycerophosphatase GEP4 [EC:3.1.3.27]
+lipid biosynthesis,main end products,phosphatidyl-glycerol,K01095,pgpA; phosphatidylglycerophosphatase A [EC:3.1.3.27]
+lipid biosynthesis,main end products,phosphatidyl-glycerol,K01096,pgpB; phosphatidylglycerophosphatase B [EC:3.1.3.27 3.1.3.81 3.1.3.4 3.6.1.27]
+lipid biosynthesis,main end products,phosphatidyl-glycerol,K18697,pgpC; phosphatidylglycerophosphatase C [EC:3.1.3.27]
+lipid biosynthesis,main end products,cardiolipin,K08744,CRLS; cardiolipin synthase (CMP-forming) [EC:2.7.8.41]
+lipid biosynthesis,main end products,cardiolipin,K06131,clsA_B; cardiolipin synthase A/B [EC:2.7.8.-]
+lipid biosynthesis,main end products,cardiolipin,K06132,clsC; cardiolipin synthase C [EC:2.7.8.-]
+lipid biosynthesis,main end products,cardiolipin,K13535,CLD1; cardiolipin-specific phospholipase [EC:3.1.1.-]
+lipid biosynthesis,main end products,phosphatidyl-ethanolamine,K17103,"CHO1, pssA; CDP-diacylglycerol---serine O-phosphatidyltransferase [EC:2.7.8.8]"
+lipid biosynthesis,main end products,phosphatidyl-ethanolamine,K00998,pssA; CDP-diacylglycerol---serine O-phosphatidyltransferase [EC:2.7.8.8]
+lipid biosynthesis,main end products,phosphatidyl-ethanolamine,K01613,"psd, PISD; phosphatidylserine decarboxylase [EC:4.1.1.65]"
+lipid biosynthesis,main end products,phosphatidyl-ethanolamine,K00993,EPT1; ethanolaminephosphotransferase [EC:2.7.8.1]
+lipid biosynthesis,main end products,phosphatidyl-choline,K00551,PEMT; phosphatidylethanolamine/phosphatidyl-N-methylethanolamine N-methyltransferase [EC:2.1.1.17 2.1.1.71]
+lipid biosynthesis,main end products,phosphatidyl-choline,K16369,CHO2; phosphatidylethanolamine N-methyltransferase [EC:2.1.1.17]
+lipid biosynthesis,main end products,phosphatidyl-choline,K00570,pmtA; phosphatidylethanolamine/phosphatidyl-N-methylethanolamine N-methyltransferase [EC:2.1.1.17 2.1.1.71]
+lipid biosynthesis,main end products,phosphatidyl-choline,K00550,PLMT; phosphatidyl-N-methylethanolamine N-methyltransferase [EC:2.1.1.71]
+lipid biosynthesis,main end products,phosphatidyl-choline,K00551,PEMT; phosphatidylethanolamine/phosphatidyl-N-methylethanolamine N-methyltransferase [EC:2.1.1.17 2.1.1.71]
+lipid biosynthesis,main end products,phosphatidyl-choline,K00994,"CHPT1, CPT1; diacylglycerol cholinephosphotransferase [EC:2.7.8.2]"
+lipid biosynthesis,main end products,phosphatidyl-choline,K13644,CEPT1; choline/ethanolamine phosphotransferase [EC:2.7.8.1 2.7.8.2]
+lipid biosynthesis,main end products,phosphatidyl-choline,K01004,pcs; phosphatidylcholine synthase [EC:2.7.8.24]
+lipid biosynthesis,main end products,phosphatidyl-choline,K01114,plc; phospholipase C [EC:3.1.4.3]
+lipid biosynthesis,main end products,phosphatidyl-choline,K16619,"plc, cpa; phospholipase C / alpha-toxin [EC:3.1.4.3]"

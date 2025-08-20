@@ -1,0 +1,300 @@
+---
+title: "metat-phyloseq"
+author: "Linnea Honeker"
+date: "3/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+library(scales)
+library(grid)
+library(reshape2)
+library(phyloseq)
+library(ggplot2)
+library(ape)
+library(magrittr)
+library(dplyr)
+library(vegan)
+library (DESeq2)
+library(devtools)
+library(RColorBrewer)
+library(microbiome)
+library(knitr)
+library(plyr)
+library(cowplot)
+library(genefilter)
+library(nlme)
+library(tidyverse)
+
+#set colors
+col_list_moisture <- c( "brown", "darkgreen")
+
+
+
+colors = c("coral4","coral",
+"chartreuse3", "darkseagreen1","blue","lightblue")
+
+```
+
+## MetaT phyloseq
+
+
+```{r import_data}
+#load kraken 2 results
+filenames <- read.csv("../output/metaT/kraken-read-taxonomy/metaT_samples_all.txt", header = FALSE)
+filenames <- filenames %>%
+  separate(V1, c("isotope", "timepoint", "moisture", "plot", "unf", "trim", "clean"), sep = "_", remove = FALSE) %>%
+  mutate(x = "x") %>%
+  mutate(timepoint = str_remove(timepoint, "H")) %>%
+  mutate(t = "t") %>%
+  unite(timepoint, c("t", "timepoint"), sep = "") %>%
+  unite(moisture, c("x", "moisture"), sep = "") %>%
+  unite(SampleID, c("plot", "moisture", "timepoint")) %>%
+  select(SampleID, V1) %>% #erase P8_x100_t3 because it doesn't have a report
+  filter(SampleID != "P8_x100_t3")
+  
+
+```
+
+
+```{r create single report table }
+        
+r=1
+for (r in 1:nrow(filenames)) {
+  if (r==1) {
+    new_id <- filenames[r, 1]
+     kraken_summary.0 <- read.delim(paste("../output/metaT/kraken-read-taxonomy/",filenames[r,2], "_report.txt", sep = ""), 
+                                    header = FALSE, sep = "\t")
+     kraken_summary.0 <- kraken_summary.0 %>%
+       mutate(SampleID = new_id)
+  }
+  else {
+    new_id <- filenames[r, 1]
+    file <- read.delim(paste("../output/metaT/kraken-read-taxonomy/",filenames[r,2], "_report.txt", sep = ""), 
+                       header = FALSE, sep = "\t")
+    file <- file %>%
+      mutate(SampleID = new_id)
+    #kraken_summary.0 <- kraken_summary.0 %>%
+    #  merge(., file, by = "V1", all = TRUE)
+    kraken_summary.0 <- rbind(kraken_summary.0, file)
+  }
+}
+
+kraken_summary <- kraken_summary.0 %>%
+  dplyr::rename(., reads = V2) %>%
+  dplyr::rename(., taxonomy = V1) 
+
+
+```
+
+```{r create taxonomy table}
+
+#create separate columns for each taxonomic level
+kraken_taxonomy <- kraken_summary %>%
+  spread(key = "SampleID", value = "reads") %>%
+  separate(taxonomy, c("Domain", "Phylum"),sep = "\\s*\\|p__\\s*") %>%
+  separate(Phylum, c("Phylum", "Class"),sep = "\\s*\\|c__\\s*") %>%
+  separate(Class, c("Class", "Order"),sep = "\\s*\\|o__\\s*") %>%
+  separate(Order, c("Order", "Family"),sep = "\\s*\\|f__\\s*") %>%
+  separate(Family, c("Family", "Genus"),sep = "\\s*\\|g__\\s*") %>%
+  separate(Genus, c("Genus", "Species"),sep = "\\s*\\|s__\\s*") %>%
+  separate(Domain, c("Domain", "Kingdom"),sep = "\\s*\\|k__\\s*") %>%
+  separate(Domain, c("Domain", "Class2"), "\\s*\\|c__\\s*") %>%
+  separate(Domain, c("Domain", "Order2"), "\\s*\\|o__\\s*") %>%
+  separate(Domain, c("Domain", "Family2"), "\\s*\\|f__\\s*") %>%
+  separate(Domain, c("Domain", "Genus2"), "\\s*\\|g__\\s*") %>%
+  separate(Domain, c("Domain", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Class", c(Class,Class2), na.rm = TRUE) %>%
+  unite("Order", c(Order,Order2), na.rm = TRUE) %>%
+  unite("Family", c(Family,Family2), na.rm = TRUE) %>%
+  unite("Genus", c(Genus,Genus2), na.rm = TRUE) %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) %>%
+  separate(Phylum, c("Phylum", "Class2"), "\\s*\\|c__\\s*") %>%
+  separate(Phylum, c("Phylum", "Order2"), "\\s*\\|o__\\s*") %>%
+  separate(Phylum, c("Phylum", "Family2"), "\\s*\\|f__\\s*") %>%
+  separate(Phylum, c("Phylum", "Genus2"), "\\s*\\|g__\\s*") %>%
+  separate(Phylum, c("Phylum", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Class", c(Class,Class2), na.rm = TRUE) %>%
+  unite("Order", c(Order,Order2), na.rm = TRUE) %>%
+  unite("Family", c(Family,Family2), na.rm = TRUE) %>%
+  unite("Genus", c(Genus,Genus2), na.rm = TRUE) %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) %>%
+  separate(Class, c("Class", "Order2"), "\\s*\\|o__\\s*") %>%
+  separate(Class, c("Class", "Family2"), "\\s*\\|f__\\s*") %>%
+  separate(Class, c("Class", "Genus2"), "\\s*\\|g__\\s*") %>%
+  separate(Class, c("Class", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Order", c(Order,Order2), na.rm = TRUE) %>%
+  unite("Family", c(Family,Family2), na.rm = TRUE) %>%
+  unite("Genus", c(Genus,Genus2), na.rm = TRUE) %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) %>%
+  separate(Order, c("Order", "Family2"), "\\s*\\|f__\\s*") %>%
+  separate(Order, c("Order", "Genus2"), "\\s*\\|g__\\s*") %>%
+  separate(Order, c("Order", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Family", c(Family,Family2), na.rm = TRUE) %>%
+  unite("Genus", c(Genus,Genus2), na.rm = TRUE) %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) %>%
+  separate(Family, c("Family", "Genus2"), "\\s*\\|g__\\s*") %>%
+  separate(Family, c("Family", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Genus", c(Genus,Genus2), na.rm = TRUE) %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) %>%
+  separate(Genus, c("Genus", "Species2"), "\\s*\\|s__\\s*") %>%
+  unite("Species", c(Species,Species2), na.rm = TRUE) 
+
+#filter to domain level which shows total across each domain (bacteria, archaea, eukaryota, and viruses)
+kraken_domain <- kraken_taxonomy %>%
+  filter(is.na(Phylum) &
+           is.na(Kingdom) &
+          Class == "" &
+           Order == "" &
+           Family == "" &
+           Genus == "" &
+           Species == "") %>%
+  select(-c(Class, Order, Family, Genus, Species, Kingdom, Phylum)) %>% 
+  filter(Domain!="s__Plasmid pWW100") %>%
+  column_to_rownames(var="Domain") 
+
+domain_to_plot.0 <- as.data.frame(t(kraken_domain))
+
+#create table to plot at domain level, summarized across timepoints and converted to relative abundance
+domain_to_plot <- domain_to_plot.0 %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint")) %>% 
+  mutate(Archaea = d__Archaea/(d__Archaea + d__Bacteria + d__Eukaryota + d__Viruses)*100) %>%
+  mutate(Bacteria = d__Bacteria/(d__Archaea + d__Bacteria + d__Eukaryota + d__Viruses)*100) %>%
+  mutate(Eukaryota = d__Eukaryota/(d__Archaea + d__Bacteria + d__Eukaryota + d__Viruses)*100) %>%
+  mutate(Viruses = d__Viruses/(d__Archaea + d__Bacteria + d__Eukaryota + d__Viruses)*100) %>%
+  select(-c(d__Archaea, d__Bacteria, d__Eukaryota, d__Viruses)) %>%
+  gather(key = "Domain", value = "RA", -c(Plot, Moisture, Timepoint)) %>%
+  group_by(Timepoint, Moisture, Domain) %>%
+  dplyr::summarize(mean_rel_abund = mean(RA))
+
+
+#filter to domain and phylum level which shows total across each domain (bacteria, archaea, fungi, other eukaryota)
+kraken_fungi_bacteria_archaea <- kraken_taxonomy %>%
+  filter(!is.na(Phylum) &
+           Class == "" &
+           Order == "" &
+           Family == "" &
+           Genus == "" &
+           Species == "") %>%
+  mutate(Domain2 = case_when(
+    Domain == "d__Archaea" ~ "Archaea",
+    Domain == "d__Bacteria" ~ "Bacteria",
+    Domain == "d__Viruses" ~ "Viruses",
+    Kingdom == "Fungi" ~ "Fungi",
+    Phylum == "Streptophyta" ~ "Plants",
+    TRUE ~ "Other Eukaryota"
+  )) %>%
+  filter(Domain!="s__Plasmid pWW100") %>%
+  select(-c(Species, Genus, Family, Order, Class,Domain, Kingdom, Phylum)) 
+
+#create dataframe to plot for archaea, bacteria, viruses, fungi, plants, other eukaryota
+kraken_fungi_bacteria_archaea_to_plot <- kraken_fungi_bacteria_archaea %>%
+  group_by(Domain2) %>%
+  dplyr::summarise(across(where(is.numeric), sum, na.rm = TRUE)) %>%
+  gather(key = "SampleID", value = "Counts", -Domain2) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) 
+
+kraken_fungi_bacteria_archaea_no_plants_to_plot <- kraken_fungi_bacteria_archaea %>%
+  filter(Domain2 != "Plants") %>%
+  filter(Domain2 != "Other Eukaryota") %>%
+  group_by(Domain2) %>%
+  dplyr::summarise(across(where(is.numeric), sum, na.rm = TRUE)) %>%
+  gather(key = "SampleID", value = "Counts", -Domain2) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) 
+
+
+
+
+```
+
+
+# Taxonomic profiles
+
+```{r echo=FALSE, comment=""}
+
+
+#######plot bacteria/archaea/fungi/plants/other eukaryota####################################
+kraken_fungi_bacteria_archaea_to_plot$Timepoint <- factor(kraken_fungi_bacteria_archaea_to_plot$Timepoint, c("t0",  "t3",  "t24", "t48", "t72", "t168"))
+
+#create category for others less than 1%
+
+p <- ggplot(kraken_fungi_bacteria_archaea_to_plot, aes(x=Timepoint, y=Counts, fill=Domain2)) 
+
+p_barplot <- p + geom_bar(aes(), stat = "identity", position = "fill") +
+  scale_fill_manual(values=colors) +
+  facet_wrap(~Moisture, labeller = labeller(Moisture = c("x100" = "100", "x50" = "50"))) +
+  scale_x_discrete(labels = c("0", "3", "24", "48", "72", "168")) +
+  labs(x = "Timepoint (h)", y = "Relative abundance (%)") +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        axis.text.x=element_text(hjust =0.5, vjust=0.2),
+        legend.title = element_blank(),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()
+  )
+p_barplot
+filename <- paste0("../figures/FigS7-metaT-read-taxonomy/metaT-bact-arch-fungi-plants.png")
+ggsave(filename,width=7,height=5,units = "in", dpi=300,p_barplot)
+filename <- paste0("../figures/FigS7-metaT-read-taxonomy/metaT-bact-arch-fungi-plants.pdf")
+ggsave(filename,width=7,height=5,units = "in", dpi=300,p_barplot)
+
+#print summary
+summary_plot <- kraken_fungi_bacteria_archaea_to_plot %>%
+  spread(key = Domain2, value = Counts) %>%
+  rowwise() %>%
+  dplyr::mutate(row_sum = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  mutate(Archaea.ra = Archaea / row_sum * 100) %>%
+  mutate(Bacteria.ra = Bacteria / row_sum * 100) %>%
+  mutate(Fungi.ra = Fungi / row_sum * 100) %>%
+  mutate(Plants.ra = Plants / row_sum * 100) %>%
+  mutate(Viruses.ra = Viruses / row_sum * 100) %>%
+  select(-c(Archaea, Bacteria, Fungi, contains("Eukaryota"), Plants, Viruses, row_sum)) %>%
+  mutate(B_F = Bacteria.ra/Fungi.ra)
+
+summary_table <- summary_plot %>%
+  group_by(Moisture, Timepoint) %>%
+  dplyr::summarise(across(where(is.numeric), mean, na.rm = TRUE)) %>%
+  mutate(B_F = (Bacteria.ra + Archaea.ra) /Fungi.ra)
+summary_table
+# Moisture Timepoint Archaea.ra Bacteria.ra Fungi.ra Plants.ra Viruses.ra   B_F
+#   <chr>    <fct>          <dbl>       <dbl>    <dbl>     <dbl>      <dbl> <dbl>
+# 1 x100     t0             0.648        66.9     8.51     16.6       0.844  7.93
+# 2 x100     t3             0.457        91.6     2.17      4.08      0.181 42.4 
+# 3 x100     t24            0.543        89.6     2.38      5.40      0.181 37.8 
+# 4 x100     t48            0.755        83.5     4.08      9.32      0.286 20.6 
+# 5 x100     t72            0.780        83.2     6.24      7.18      0.557 13.4 
+# 6 x100     t168           0.932        79.6     5.05     10.6       1.10  16.0 
+# 7 x50      t0             0.649        65.7     8.51     18.1       1.64   7.80
+# 8 x50      t3             0.424        91.5     2.14      4.28      0.306 42.9 
+# 9 x50      t24            0.607        89.2     2.66      5.66      0.273 33.8 
+#10 x50      t48            0.846        86.4     4.09      6.67      0.304 21.3 
+#11 x50      t72            0.813        80.8     5.03     11.4       0.328 16.2 
+#12 x50      t168           0.950        80.6     5.47     10.1       0.721 14.9 
+
+#plot B:F ratio
+plot <- summary_plot %>%
+  ggplot(.,aes(x=Timepoint, y = B_F, fill=Moisture)) +
+  geom_boxplot() +
+  scale_x_discrete(labels = c("0", "3", "24", "48", "72", "168")) +
+  scale_fill_manual(values = col_list_moisture,
+                    labels = c("50", "100")) + 
+  labs(x = "Timepoint (h)", y = "Bacteria/Archaea:Fungi") +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+plot
+filename <- paste0("../figures/FigS7-metaT-read-taxonomy/metaT-bact-fungi-ratio.png")
+ggsave(filename,width=5,height=4.5,units = "in", dpi=300,plot)
+filename <- paste0("../figures/FigS7-metaT-read-taxonomy/metaT-bact-fungi-ratio.pdf")
+ggsave(filename,width=5,height=4.5,units = "in", dpi=300,plot)
+
+
+
+
+
+```

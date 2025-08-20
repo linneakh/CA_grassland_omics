@@ -1,0 +1,14 @@
+,cazyid,enzyme,VIP,Comp1,VIP.sign,class,substrate,source ,category
+12,PL42,"L-rhamnose-alpha-1,4-D-glucuronate",1.102325521,-0.266351509,-1.102325521,PL,pectin,plant,degradation
+6,GH87,mycodextranase,0.952607206,-0.262693499,-0.952607206,GH,mycodextran,microbes,degradation
+8,GT10,galactoside,0.948796356,-0.099719595,-0.948796356,GT,glycolipids,microbes,biosynthesis
+3,GH65,"alpha,alpha-trehalase",0.935482354,-0.369562103,-0.935482354,GH,trehalose,plants_microbes,degradation
+4,GH67,alpha-glucuronidase,0.882767244,-0.198526289,-0.882767244,GH,glucuronoxylan,plant,degradation
+2,GH2,beta-galactosidase,0.869741038,-0.348791216,-0.869741038,GH,galactosidase,plants_microbes,degradation
+10,GT76,Dol-P-Man:,0.812813677,0.319443463,0.812813677,GT,glycoprotein,plants_microbes,biosynthesis
+13,PL6,alginate,0.831870717,0.226724339,0.831870717,PL,alginate,microbes,degradation
+1,GH146,beta-L-arabinofuranosidase,0.880839983,0.259316344,0.880839983,GH,arabinans,plants,degradation
+11,PL12,heparin-sulfate,0.991925833,0.296248177,0.991925833,PL,heparin,animals,degradation
+7,GH93,"exo-alpha-L-1,5-arabinanase",1.005277033,0.359332971,1.005277033,GH,arabinans,plants ,degradation
+5,GH76,"alpha-1,6-mannanase",1.121875526,0.24855985,1.121875526,GH,mannan,microbes,degradation
+9,GT12,[N-acetylneuraminyl]-galactosylglucosylceramide,1.478070097,0.360030531,1.478070097,GT,glycolipids,microbes,biosynthesis

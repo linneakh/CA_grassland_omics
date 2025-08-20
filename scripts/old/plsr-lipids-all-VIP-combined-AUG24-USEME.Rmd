@@ -1,0 +1,968 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(vegan)
+library(ggplot2)
+library(rms)
+library(reshape2)
+library(coefplot)
+library(MASS)
+library(lme4)
+#library(MASS)
+library(leaps)
+library(car)
+library(relaimpo)
+library(nlme)
+library(lmerTest)
+library(plsdepot)
+library(pls)
+library(caret)
+library(DESeq2)
+library(plsVarSel)
+library(WGCNA)
+library(tidyverse)
+
+colors = c("black", "gray","coral4",
+"chartreuse3", "darkseagreen1","blue","lightblue",
+"yellow4", "yellow","darkorchid", "plum2",
+"darkred", "darksalmon","green4",
+"greenyellow","orange",
+"moccasin",   "hotpink4", "lightpink", "lightblue4", "lightcyan3",  "lightslateblue", "lightsteelblue1", "navy",
+"darkgray", "brown", "cornflowerblue","darkgoldenrod",
+"brown3","aliceblue","aquamarine",
+"beige","bisque","blue2","blueviolet","cyan","darkblue",
+"chocolate","aquamarine3","darkcyan","deeppink",
+"darkred","darkslateblue", "red", "green", "blue", "purple", "yellow", "brown",
+"black","gray","coral4","coral",
+"chartreuse3", "darkseagreen1","blue","lightblue",
+"yellow4", "yellow","darkorchid", "plum2",
+"darkred", "darksalmon","green4",
+"greenyellow","orange",
+"moccasin",   "hotpink4", "lightpink", "lightblue4", "lightcyan3",  "lightslateblue", "lightsteelblue1", "navy",
+"darkgray", "brown", "cornflowerblue","darkgoldenrod",
+"brown3","aliceblue","aquamarine",
+"beige","bisque","blue2","blueviolet","cyan","darkblue",
+"chocolate","aquamarine3","darkcyan","deeppink",
+"darkred","darkslateblue", "red", "green", "blue", "purple", "yellow", "brown")
+
+colors.short = c("black", "gray","coral4",
+"chartreuse3", "darkseagreen1","lightblue",
+"yellow4", "yellow","darkorchid", "plum2",
+"darkred", "darksalmon","green4")
+
+#library(metabom8)
+
+```
+
+# load metabolite and growth data
+```{r import data}
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+
+#select only cue column
+cue.only <- cue %>%
+  dplyr::select(SampleID, CUE.metric)
+
+#load lipids
+datExpr.0b <- read.csv("../../qSIP-old-pipeline/qSIP_output/omics_datasets/lipids.csv", header = TRUE)
+datExpr <- as.data.frame(datExpr.0b) %>%
+  column_to_rownames(var = "X") %>%
+  mutate_at(1:33, as.numeric) %>%
+  filter(!grepl("t0", row.names(.)))
+
+
+datExpr.cue <- datExpr %>%
+  #t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "SampleID")
+
+#merge lc-ms and cue-only
+cue.all <- cue.only %>%
+  merge(datExpr.cue, by = "SampleID") %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  dplyr::select(-c(Plot, Moisture, Timepoint)) %>%
+  column_to_rownames(var = "SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  select(-CUE.metric)
+
+cue.timepoint <- cue.all %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE)
+
+
+
+```
+
+
+#PLSR and VIP selection
+```{r plsr-vip}
+# Fit model (uses cue.all created earlier in your workflow)
+m_full <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, validation = "LOO")
+m1     <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, ncomp = 1)
+
+# Helper to clean KO names
+.clean_Compounds <- function(x) gsub("[`']", "", x)
+
+# VIP (all KOs)
+VIP_df <- VIP(m1, opt.comp = 1) %>%
+  as.data.frame() %>%
+  setNames("VIP") %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_KO(Compounds))
+
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+p_df <- as.data.frame(m1$loadings) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .}
+rownames(p_df) <- VIP_df$Compounds
+
+p_df <- p_df %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_Compounds(Compounds)) %>%
+  { 
+    num_cols <- setdiff(names(.), "Compounds")
+    if (length(num_cols) == 0) tibble(Compounds = .$Compounds, P1 = NA_real_) else transmute(., Compounds, P1 = .data[[num_cols[1]]])
+  }
+
+w_df <- as.data.frame(m1$loading.weights) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .} 
+
+rownames(w_df) <- VIP_df$Compounds
+
+w_df <- w_df %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_Compounds(Compounds)) %>%
+  { 
+    num_cols <- setdiff(names(.), "Compounds")
+    if (length(num_cols) == 0) tibble(Compounds = .$Compounds, W1 = NA_real_) else transmute(., Compounds, W1 = .data[[num_cols[1]]])
+  }
+
+q1 <- as.numeric(m1$Yloadings[1,1])
+
+b_vec <- as.vector(coef(m1)[,,1])
+Compounds_b  <- names(coef(m1)[,,1])
+b_df  <- tibble(Compounds = .clean_Compounds(Compounds_b), coef = as.numeric(b_vec))
+
+
+# Merge everything and compute a "proper" signed VIP using sign(W1 * q1)
+VIP_all <- VIP_df %>%
+  merge(p_df, by = "Compounds") %>%
+  merge(w_df, by = "Compounds") %>%
+  merge(b_df, by = "Compounds") %>%
+  mutate(
+    q1        = q1,
+    sign_eff  = dplyr::case_when(is.na(W1) | is.na(q1) ~ 1,
+                                 TRUE ~ sign(W1 * q1)),
+    VIP_signed = VIP * sign_eff
+  )
+
+
+
+colnames(VIP_all)[3:4] <- c("loading_comp1", "weight_comp1")
+
+# Top 10% threshold and vector of KOs (still based on magnitude of VIP)
+q_90    <- quantile(VIP_all$VIP, probs = 0.9, na.rm = TRUE)
+VIP_top <- VIP_all %>% filter(VIP > q_90) %>%
+    separate(Compounds, c("Type", "other"), remove = FALSE) %>%
+  arrange(desc(VIP_signed)) %>%
+  mutate(Compounds, fct_reorder(Compounds, VIP_signed)) 
+
+vip_cpds <- VIP_top$Compounds
+
+# (Optional) inspect
+# head(VIP_all)
+# head(VIP_top)
+# Example: percent
+```
+
+```{r plot all cazy and lc-ms VIPs and comp}
+
+
+#plot VIP scores
+plot <- ggplot(VIP_top, aes(x=factor(Compounds, levels = unique(Compounds)), y = VIP_signed, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.8) +  
+  xlab("lipid") +
+  ylab("VIP") +
+  scale_fill_manual(values = c(colors)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+          panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
+plot
+# ggsave("../figures/FigS5-PLSR/VIP-cazy-top-10-per-substrate.png", width = 10, height = 7, dpi = 300, units = "in")
+# ggsave("../figures/FigS5-PLSR/VIP-cazy-top-10-per-substrate.pdf", width = 10, height = 7, dpi = 300, units = "in")
+
+
+
+
+```
+
+```{r stacked plot of ko counts}
+#summarize counts
+#add direction column
+VIP.direction <- VIP.comp %>%
+  mutate(direction = case_when(
+    VIP.sign > 0 ~ "positive",
+    VIP.sign < 0 ~ "negative"
+  )) %>%
+  mutate(direction = factor(direction, levels = c("positive", "negative")))
+
+#l2
+VIP.counts <- VIP.direction %>%
+  group_by(direction, type) %>%
+  dplyr::summarise(n = n())
+
+VIP.counts.f <- VIP.counts %>%
+  filter(n > 1) 
+
+
+#level2
+VIP.stacked.plot <- VIP.counts %>%
+  ggplot(aes(x = direction, y = n, fill = type)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = c(colors)) 
+VIP.stacked.plot
+ggsave("../../Figures/PLSR/VIP-stacked-lipids-combined.png", width = 8, height = 6, dpi = 300, units = "in")
+
+
+
+#category- filtered
+VIP.stacked.plot <- VIP.counts.f %>%
+  ggplot(aes(x = direction, y = n, fill = type)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c(colors.short)) +
+  theme_bw() +
+  theme(text = element_text(size = 12))
+VIP.stacked.plot
+ggsave("../../Figures/PLSR/VIP-stacked-lipids-combined-cat-f.png", width = 5, height = 6, dpi = 300, units = "in")
+
+
+
+
+```
+
+```{r}
+
+#plot some of the data based on PLSR results (see below)
+#negative association with CUE
+for (g in VIP.comp$Query) {
+  
+  p <- ggplot(data = cue.timepoint, aes_string(x="CUE.g.dry", y=g)) +
+    geom_point() +
+    geom_smooth(method = "lm", se=TRUE, size=1) 
+  print(p)
+  
+  print(g)
+  cor <- as.matrix(cor(x=cue.all$CUE.g.dry, y = cue.all[[g]]))
+  print(cor)
+  cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.all))
+  print(cor.p)
+}
+
+
+#K19155 is questionable...postitive correlation driven by t48
+```
+
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.all %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 1) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =1)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 1, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=1))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.9)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 1)
+m1$loadings
+
+```
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 5) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =5)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 5, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=5))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.95)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 5)
+
+
+```
+
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 4) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =4)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 4, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=4))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.94)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 4)
+
+
+```
+
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 3) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =3)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 3, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=3))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.94)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 3)
+
+
+```
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 4) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =4)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 4, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=4))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.93)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 4)
+
+
+```
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 3) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =3)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 3, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=3))
+colnames(VIP) <- "VIP"
+VIP
+
+VIP.f <- VIP %>%
+  filter(VIP > 0.94)
+
+meta_imp_2 <- rownames(VIP.f)
+meta_imp_2 <- gsub("`", "", meta_imp)
+
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps = 3)
+
+
+```
+
+set up model data frame using Johnny's scripts and the plsr function of the pls package
+```{r}
+model_data <- cue.100 %>%
+  dplyr::select(meta_imp_2, CUE.g.dry)
+
+set.seed(123)
+m_full <- plsr(CUE.g.dry ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+```
+
+```{r}
+
+m1 <- plsr(CUE.g.dry ~ ., data = model_data, 
+     scale = TRUE, ncomp = 3) 
+summary(m1)
+plot(m1)
+```
+
+create a plsr and null model to compare and calculate residuals of both
+```{r}
+model_vals <- data.frame(
+  preds = numeric(length = nrow(model_data)), 
+  res0 = numeric(length = nrow(model_data)),
+  res1 = numeric(length = nrow(model_data))
+)
+
+
+for(i in 1:nrow(model_data)){
+  y <- model_data$CUE.g.dry
+  
+  m <- plsr(CUE.g.dry ~ ., data = model_data[-i,], 
+     scale = TRUE, ncomp =3)
+  model_vals$preds[i] <- predict(m, newdata = model_data[i,], 
+                                 ncomp = 3, type = "response")
+  # predicted residual of the model
+  model_vals$res1[i] <-y[i] - model_vals$preds[i]
+  
+  # predicted residual using the null model
+  y_mean = mean(y[-i])
+  model_vals$res0[i] = y[i] - y_mean
+}
+
+plot(model_data$CUE.g.dry, model_vals$preds)
+
+```
+Use F-Test to compare to null model
+
+This is done analogues to comparing a regression model to a null model, 
+i.e. by comparing the Residual some of squares of model and null model, calculating the F value using the respective degrees of freedom of the two models and getting the two-sided p-value via the cumulative distribution function of the F distribution. 
+
+```{r}
+RSS1 = sum((model_vals$res1)^2)
+RSS0 = sum((model_vals$res0)^2)
+
+df1 = nrow(model_data) - (ncol(model_data) - 1) - 1
+df0 = nrow(model_data) - 1
+
+F_value <- ((RSS0 - RSS1) / (df0 - df1)) / (RSS1 / df1)
+c(F = F_value, df0 = df0, df1 = df1, RSS0 = RSS0, RSS1 = RSS1)
+
+p.value <-  pf(F_value, df0, df1, lower.tail = FALSE)
+p.value
+
+```
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=3))
+colnames(VIP) <- "VIP"
+VIP
+#meta_imp <- rownames(VIP)
+
+plot(m1, "loadings", comps =3)
+
+
+```
+```{r}
+#create dataframe of component loadings
+load.mat <- as.matrix(m1$loadings)
+load.df <- as.data.frame(load.mat) 
+rownames(load.df) <- rownames(load.mat)
+load.df <- load.df[-c(11:30),] %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Query") %>%
+  mutate(Query = str_remove(Query, "`")) %>%
+  mutate(Query = str_remove(Query, "'")) %>%
+  mutate(Query = str_remove(Query, "`"))
+
+#try to remove space in "Comp 1"
+colnames(load.df) <- str_replace(colnames(load.df), "x", "Comp1")
+
+#merge VIP scores with KEGG classifications and components
+VIP.kegg <- VIP %>%
+  rownames_to_column(var = "Query") %>%
+  merge(load.df, by = "Query", all.x= TRUE) %>%
+  distinct() %>%
+  drop_na(Comp1) %>%
+  mutate(Comp1 = as.numeric(Comp1)) %>%
+  mutate(VIP.sign = case_when(
+    Comp1 > 0 ~ VIP,
+    Comp1 < 0 ~ -VIP
+  )) %>%
+  arrange(desc(VIP.sign)) %>%
+  mutate(Query, fct_reorder(Query, VIP.sign)) %>%
+  mutate(CazyCategory = substr(Query ,1, 2)) 
+
+VIP.kegg
+
+
+write.csv(VIP.kegg, "../../qSIP_output/PLSR/100_results_sig_0.27_3comp_98_gr_1.csv")
+
+#plot VIP scores
+plot <- ggplot(VIP.kegg, aes(x=factor(Query, levels = unique(Query)), y = VIP.sign, fill = CazyCategory)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  xlab("Cazy IDs") +
+  ylab("VIP") +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 6, angle = 45, hjust = 1))
+plot
+
+```
+
+
+```{r}
+
+#plot some of the data based on PLSR results (see below)
+#negative association with CUE
+for (g in VIP.kegg$Query) {
+  
+  p <- ggplot(data = cue.100.timepoint, aes_string(x="CUE.g.dry", y=g, color = "Timepoint")) +
+    geom_point()
+  print(p)
+  
+  print(g)
+  cor <- as.matrix(cor(x=cue.100$CUE.g.dry, y = cue.100[[g]]))
+  print(cor)
+  cor.p <- corPvalueStudent(cor, nSamples = nrow(cue.100))
+  print(cor.p)
+}
+
+
+#K19155 is questionable...postitive correlation driven by t48
+```

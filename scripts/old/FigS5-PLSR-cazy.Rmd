@@ -1,0 +1,280 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(vegan)
+library(ggplot2)
+library(rms)
+library(reshape2)
+library(coefplot)
+library(MASS)
+library(leaps)
+library(car)
+library(relaimpo)
+library(plsdepot)
+library(pls)
+library(caret)
+library(DESeq2)
+library(plsVarSel)
+library(tidyverse)
+
+
+fill = c("purple", "#0d1261", "#4d52a1","#a6a8d0", "#6D2E1E",  "#9B3D26", "#CB4C2F", "#FF7D5A",  "#00441B","#1B7837",
+         "#78C679",  "#d5f7d5")
+ 
+source("../scripts/extra_functions_NMDS_correlations.R")
+
+
+```
+
+# load metabolite and growth data
+```{r import data}
+#load files
+#birth and death rates and cue - lenient
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-X)
+
+#select only cue column
+cue.only <- cue %>%
+  dplyr::select(SampleID, CUE.metric) %>%
+  filter(SampleID != "P08_x100_t3")
+
+
+#load gene expression (VST transformed) 
+datExpr.0b <- read.csv("../output/metaT/vst-cazy-no-t0.csv", header = TRUE)
+datExpr <- as.data.frame(datExpr.0b) %>%
+  column_to_rownames(var = "X") 
+
+#prepare and transpose to merge with cue
+datExpr.cue <- datExpr %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "SampleID")
+
+#merge lc-ms and cue-only
+cue.all <- cue.only %>%
+  merge(datExpr.cue, by = "SampleID") %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  dplyr::select(-c(Plot, Moisture, Timepoint)) %>%
+  column_to_rownames(var = "SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  select(-CUE.metric)
+
+cue.timepoint <- cue.all %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE)
+
+
+
+```
+
+
+
+
+
+set up model data frame the plsr function of the pls package
+```{r}
+model_data <- cue.all
+
+set.seed(123)
+m_full <- plsr(CUE.metric.log ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+#re-create model with just one component
+m1 <- plsr(CUE.metric.log ~ ., data = model_data, 
+     scale = TRUE, ncomp = 1) 
+summary(m1)
+plot(m1)
+
+#30.16 variance explained with all genes
+
+```
+
+```{r}
+
+VIP <- as.data.frame(VIP(m1, opt.comp=1)) 
+colnames(VIP) <- "VIP"
+
+#calculate VIP threshold accounting for top 5 % of VIP scores
+q = quantile(VIP$VIP, probs = 0.95) #>1.88
+
+#filter to just those KOs in the top 10 % of VIP scores
+VIP.f <- VIP %>%
+  filter(VIP > q)
+
+meta_imp <- rownames(VIP.f)
+meta_imp <- gsub("`", "", meta_imp)
+
+plot(m1, "loadings", comps = 1)
+```
+
+
+
+#use plsVarSel to slect combination of variables leading to model with lowest prediction error
+
+```{r}
+model_data <- cue.all %>%
+  dplyr::select(meta_imp, CUE.metric.log)
+
+set.seed(123)
+m_full <- plsr(CUE.metric.log ~ ., data = model_data, scale = TRUE, validation = "LOO")
+summary(m_full)
+
+par(mfrow = c(3,1))
+validationplot(m_full)
+validationplot(m_full, val.type = "RMSEP")
+
+#re-create model with just one component
+m1 <- plsr(CUE.metric.log ~ ., data = model_data, 
+     scale = TRUE, ncomp = 1) 
+summary(m1)
+plot(m1)
+
+#36.43 % of variance explained with top 5 % of genes
+
+
+```
+
+
+
+
+
+```{r}
+#create data frame of VIP scores
+VIP <- as.data.frame(VIP(m1, opt.comp=1)) 
+colnames(VIP) <- "VIP"
+
+#create dataframe of component loadings
+load.mat <- as.matrix(m1$loadings)
+load.df <- as.data.frame(load.mat) 
+rownames(load.df) <- rownames(load.mat)
+load.df <- load.df %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Query") %>%
+  mutate(Query = str_remove(Query, "`")) %>%
+  mutate(Query = str_remove(Query, "'")) %>%
+  mutate(Query = str_remove(Query, "`")) %>%
+  separate(Query, c("cazyID", "enzyme"), sep = " ") %>%
+  mutate(cazyID = str_remove(cazyID, "`"))
+
+#try to remove space in "Comp 1"
+colnames(load.df) <- str_replace(colnames(load.df), " ", "")
+
+#merge VIP scores with KEGG classifications and components
+VIP.cazy <- VIP %>%
+  rownames_to_column(var = "Query") %>%
+  separate(Query, c("cazyID", "enzyme"), sep = " ") %>%
+  mutate(cazyID = str_remove(cazyID, "`")) %>%
+  merge(load.df, by = c("cazyID", "enzyme"), all.x= TRUE) 
+
+colnames(VIP.cazy) <- c("cazyid", "enzyme", "VIP", "Comp1")
+
+VIP.cazy <- VIP.cazy %>%
+  mutate(Comp1 = as.numeric(Comp1)) %>%
+  mutate(VIP.sign = case_when(
+    Comp1 > 0 ~ VIP,
+    Comp1 < 0 ~ -VIP
+  )) %>%
+    distinct() %>%
+  mutate(class = case_when(
+    startsWith(cazyid, "GT") ~ "GT",
+    startsWith(cazyid, "PL") ~ "PL",
+    startsWith(cazyid, "GH") ~ "GH",
+    startsWith(cazyid, "CBM") ~ "CBM",
+    startsWith(cazyid, "CE") ~ "CE",
+    startsWith(cazyid, "AA") ~ "AA"
+  ))
+  
+
+
+write.csv(VIP.cazy, "../output/PLSR/VIP_cazy_top_5.csv")
+
+```
+
+
+
+
+
+
+```{r plot all cazy and lc-ms VIPs and comp}
+
+#add categories to VIP list and reload
+
+VIP.cazy <- read.csv("../output/PLSR/VIP_cazy_top_5.csv") %>% select(-X) %>%
+  arrange(desc(VIP.sign)) %>%
+  mutate(cazyid, fct_reorder(cazyid, VIP.sign)) %>%
+  unite(source_substrate, c("source", "substrate"), remove = FALSE) %>%
+  unite(finale, c("source", "category"), remove = FALSE) %>%
+  unite(substrate_category, c( "substrate", "category"), sep = " ", remove = FALSE) %>%
+  mutate(substrate_category = str_replace(substrate_category, "biosynthesis", "(B)")) %>%
+  mutate(substrate_category = str_replace(substrate_category, "degradation", "(D)")) 
+  
+
+
+
+VIP.cazy$substrate_category <- factor(VIP.cazy$substrate_category, levels = c("heparin (D)", "glycolipids (B)", "mannan (D)", "alginate (D)",  "glycoprotein (B)",
+                                                                              "galactosidase (D)",  "mycodextran (D)",       
+                                                              "trehalose (D)", "arabinans (D)","pectin (D)", "glucuronoxylan (D)"))
+#plot VIP scores and color based on class_substrate
+plot <- ggplot(VIP.cazy, aes(x=factor(cazyid, levels = unique(cazyid)), y = VIP.sign, fill = substrate_category)) +
+  geom_hline(yintercept = 1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_hline(yintercept = -1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "CAZy ID", y = "VIP score", fill = "Category") +
+  scale_fill_manual(values = c(fill)) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.8) +  
+  theme_bw() +
+  theme(text = element_text(size = 12),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+plot
+ggsave("../figures/FigS5-PLSR/VIP-cazy-top-5-per-substrate.png", width = 10, height = 7, dpi = 300, units = "in")
+ggsave("../figures/FigS5-PLSR/VIP-cazy-top-5-per-substrate.pdf", width = 10, height = 7, dpi = 300, units = "in")
+
+
+
+```
+
+summarise total sum of expression of cazy genes negatively and positively associated with CGE metric
+```{r}
+VIP.summary <- datExpr %>%
+  rownames_to_column(var = "cazy") %>%
+  separate(cazy, c("cazyid", "other"), sep = " ") %>%
+  select(-other) %>%
+  merge(VIP.cazy, by = "cazyid") %>%
+  mutate(direction = case_when(
+    VIP.sign >0 ~ "positive",
+    VIP.sign <0 ~ "negative"
+  )) %>%
+  gather(key = "SampleID", value = "VST", -c(enzyme, VIP, Comp1, VIP.sign, class, direction, cazyid)) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE)
+  
+
+
+#all rewet time points
+m <- lmer(VST ~ direction * Moisture  + (1|Plot), data = VIP.summary)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                    Sum Sq Mean Sq NumDF DenDF  F value  Pr(>F)    
+# direction          385.24  385.24     1   503 114.4961 < 2e-16 ***
+# Moisture             0.08    0.08     1   503   0.0226 0.88045    
+# direction:Moisture   9.32    9.32     1   503   2.7697 0.09668 .  
+
+plot.summary <- VIP.summary %>%
+  ggplot(aes(x=direction, y = VST)) +
+  geom_boxplot() +
+  theme_bw()
+
+
+```
+

@@ -1,0 +1,203 @@
+---
+title: "Fig1 taxon specific growth rates"
+author: "Linnea Honeker"
+date: "2023-10-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(stringr)
+library(cowplot)
+library(readxl)
+library(ggtrendline)
+library(tidyverse)
+
+Dir.f = "../figures/Fig1-taxon-specific-growth-rates/"
+Dir.o = "../output/taxon-specific-growth-rates/"
+Dir.omics = "../output/omics_datasets/"
+
+
+source("../scripts/Fig1-functions-taxa-specific-rates.R")
+
+moisture_col_list <- c("darkgreen", "brown")
+
+col_list <- c( "chartreuse3", "darkseagreen1","orange","lightgoldenrod","blue","lightblue", 
+                             "orange4", "yellow2", "red4","tan", "brown1","darkorchid", "plum2","darkturquoise", "aquamarine2",
+                              "hotpink4", "lightpink", "slateblue4", "lightslateblue", "darkgoldenrod", "moccasin","navy", "lightsteelblue3", 
+                       "darksalmon","bisque", "blueviolet", "violet","cyan4","cyan",
+                             "coral4","coral","darkred", "deeppink",
+                             "darkslateblue","cornflowerblue")
+
+```
+
+## Combine death/growth rate files for all time comparisons to 0 hr, with 16_18 in filename (need to ask what this means again)
+
+```{r import data}
+#load files
+rates.50.3 <- read.delim("../output/50-growth-rates/all_rates_3h_16_18.txt", sep = "\t", header = TRUE)
+rates.50.24 <- read.delim("../output/50-growth-rates/all_rates_24h_16_18.txt", sep = "\t", header = TRUE)
+rates.50.48 <- read.delim("../output/50-growth-rates/all_rates_48h_16_18.txt", sep = "\t", header = TRUE)
+rates.50.72 <- read.delim("../output/50-growth-rates/all_rates_72h_16_18.txt", sep = "\t", header = TRUE)
+rates.50.168 <- read.delim("../output/50-growth-rates/all_rates_168h_16_18.txt", sep = "\t", header = TRUE)
+
+rates.100.3 <- read.delim("../output/100-growth-rates/all_rates_3h_16_18.txt", sep = "\t", header = TRUE)
+rates.100.24 <- read.delim("../output/100-growth-rates/all_rates_24h_16_18.txt", sep = "\t", header = TRUE)
+rates.100.48 <- read.delim("../output/100-growth-rates/all_rates_48h_16_18.txt", sep = "\t", header = TRUE)
+rates.100.72 <- read.delim("../output/100-growth-rates/all_rates_72h_16_18.txt", sep = "\t", header = TRUE)
+rates.100.168 <- read.delim("../output/100-growth-rates/all_rates_168h_16_18.txt", sep = "\t", header = TRUE)
+
+
+
+#import taxonomy table and reformat
+tax.0 <- read.delim("../data/taxonomy_table_reads_USEME.txt", sep = "\t", header = FALSE)
+tax <- tax.0 |>
+  dplyr::rename(taxonID = V1) |>
+  dplyr::rename(taxonomy = V2) 
+write.csv(tax, paste(Dir.o, "taxonomy_table.csv", sep = ""))
+
+######combine 0 to time tables######
+rates.50.0 <- rbind(rates.50.3, rates.50.24, rates.50.48, rates.50.72, rates.50.168) %>% drop_na()
+rates.100.0 <- rbind(rates.100.3, rates.100.24, rates.100.48, rates.100.72, rates.100.168) %>% drop_na()
+
+#add an additional column for moisture and merge with taxonomy
+rates.50 <- rates.50.0 |>
+  mutate(moisture = "50") |>
+  merge(tax, by = "taxonID", all.x = TRUE, all.y = FALSE)
+
+rates.100 <- rates.100.0 |>
+  mutate(moisture = "100") |>
+  merge(tax, by = "taxonID", all.x = TRUE, all.y = FALSE)
+
+#create final  rates file
+rates.0 <- rbind(rates.50, rates.100)
+
+rates <- rates.0  |>
+  select(taxonID, trt.code.2, ape.boot.median, r.net.boot.median, b.boot.median, d.boot.median, taxonomy, moisture) |>
+  mutate(Timepoint = str_replace(trt.code.2, "_18O", "")) |>
+  #select(-trt.code.2) |>
+  unite(SampleID, c("Timepoint", "moisture"), remove = FALSE)
+
+
+#filter taxa to just those with birth rates significantly greater than zero (both medians > 0)
+rates.b.d.f.wide <- rates.0 |>
+  select(taxonID, trt.code.2, moisture, taxonomy, b.boot.median, 
+                d.boot.median) |>
+  mutate(b.boot.median = case_when(
+    b.boot.median < 0 ~ 0,
+    b.boot.median > 0 ~ b.boot.median
+  )) |>
+  mutate(d.boot.median = case_when(
+    d.boot.median > 0 ~ 0,
+    d.boot.median < 0 ~ d.boot.median
+  )) 
+
+write.csv(rates.b.d.f.wide, paste(Dir.o, "birth_death_rates_summary_new_Filter_wide.csv", sep = ""))
+
+rates.b.d.f.long <- rates.b.d.f.wide |>
+  gather(key = "type", value = "median", -c(trt.code.2, taxonomy, taxonID, moisture)) 
+write.csv(rates.b.d.f.long, paste(Dir.o, "birth_death_rates_summary_new_Filter_long.csv", sep = ""))
+
+#convert this rates file to a data table with samples with universalish names (replicates combined)as rows and growth #rates as columns for combination with 'omics datasets
+rates.meta.omics.all.long <- rates.b.d.f.long |>
+  separate(trt.code.2, c("timepoint", "isotope")) |>
+  mutate(moisture = gsub("50", "x50", moisture)) |>
+  mutate(moisture = gsub("100", "x100", moisture)) |>
+  unite(time_moisture, c("moisture", "timepoint")) |>
+  dplyr::select(-c(taxonID, isotope)) 
+
+rates.meta.omics.all.wide <- rates.b.d.f.wide |>
+   separate(trt.code.2, c("timepoint", "isotope")) |>
+  mutate(moisture = gsub("50", "x50", moisture)) |>
+  mutate(moisture = gsub("100", "x100", moisture)) |>
+  unite(time_moisture, c("moisture", "timepoint")) |>
+  dplyr::select(-c(taxonID, isotope)) 
+
+rates.meta.omics.grouped <- rates.meta.omics.all.wide |>
+  group_by(time_moisture) |>
+    drop_na() |>
+  dplyr::summarise(b.boot.median = sum(b.boot.median),
+               
+                   d.boot.median = sum(d.boot.median)) |>
+  #spread(key = type, value = mean) |>
+  column_to_rownames(var = "time_moisture") 
+  
+write.csv(rates.meta.omics.grouped, paste(Dir.o, "rates-meta.csv", sep = ""))
+write.csv(rates.meta.omics.grouped, paste(Dir.omics, "rates-meta.csv", sep = ""))
+
+
+
+#create dataframe of summaries of birth and death per phylum. filter out phyla with data from only one time point
+rates.meta.omics.all.taxa <- rates.meta.omics.all.wide %>%
+  separate(taxonomy, c("domain", "phylum", "class", "order", "family", "genus"), sep = ";") %>%
+  filter(phylum != "p_candidate division WPS-2" &
+           phylum != "p_Fusobacteria" &
+           phylum != "p_Armatimonadetes" &
+           phylum != "p_Cyanobacteria/Chloroplast")
+
+rates.meta.omics.all.taxa.grouped.phylum <- rates.meta.omics.all.taxa %>%
+ group_by(phylum, time_moisture) %>%
+dplyr::summarise(b.boot.median = sum(b.boot.median),
+                  
+                   d.boot.median = sum(d.boot.median))
+
+write.csv(rates.meta.omics.all.taxa.grouped.phylum, paste(Dir.o, "rates-seq-meta-taxa.csv", sep = ""))
+write.csv(rates.meta.omics.all.taxa.grouped.phylum, paste(Dir.omics, "rates-seq-meta-taxa.csv", sep = ""))
+
+
+#create dataframe of summaries of birth and death per genus filter out genus with rates of zero
+rates.meta.omics.all.taxa <- rates.meta.omics.all.wide %>%
+  separate(taxonomy, c("domain", "phylum", "class", "order", "family", "genus"), sep = ";") %>%
+  filter(phylum != "p_candidate division WPS-2" &
+           phylum != "p_Fusobacteria" &
+           phylum != "p_Armatimonadetes" &
+           phylum != "p_Cyanobacteria/Chloroplast")
+
+rates.meta.omics.all.taxa.grouped.genus <- rates.meta.omics.all.taxa %>%
+ group_by(genus, time_moisture) |>
+  drop_na() |>
+ dplyr::summarise(b.boot.median = sum(b.boot.median),
+                  
+                   d.boot.median = sum(d.boot.median)) |>
+  filter(b.boot.median != 0 &
+           d.boot.median != 0 ) 
+
+write.csv(rates.meta.omics.all.taxa.grouped.genus, paste(Dir.o, "rates-meta-taxa-genus.csv", sep = ""))
+write.csv(rates.meta.omics.all.taxa.grouped.genus, paste(Dir.omics, "rates-meta-taxa-genus.csv", sep = ""))
+
+```
+
+
+
+
+```{r net growth rate plots, fig.dim = c(8, 20)}
+
+
+#50 and 100, birth rates bar plots
+plot.bar.b_fixed <- bar_plot_b_fixed(rates.b.d.f.long)
+plot.bar.b_fixed
+ggsave(paste(Dir.f,"bar_50_100_b_f_fixed_new_Filter.png", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+ggsave(paste(Dir.f,"bar_50_100_b_f_fixed_new_Filter.pdf", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+
+#50 and 100, death rates bar plots
+plot.bar.d_fixed <- bar_plot_d_fixed(rates.b.d.f.long)
+plot.bar.d_fixed
+ggsave(paste(Dir.f,"bar_50_100_d_f_fixed_new_Filter.png", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+ggsave(paste(Dir.f,"bar_50_100_d_f_fixed_new_Filter.pdf", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+
+#50 and 100, death rates bar plots
+plot.bar.d <- bar_plot_d(rates.b.d.f.long)
+plot.bar.d
+ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter.png", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter.pdf", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+
+plot.bar.b_fixed
+plot.bar.d_fixed
+
+```
+
+
+
+
+
+

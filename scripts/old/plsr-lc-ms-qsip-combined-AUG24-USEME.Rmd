@@ -1,0 +1,286 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(vegan)
+library(ggplot2)
+library(rms)
+library(reshape2)
+library(coefplot)
+library(MASS)
+library(dplyr)
+library(lme4)
+library(MASS)
+library(leaps)
+library(car)
+library(relaimpo)
+library(nlme)
+library(lmerTest)
+library(plsdepot)
+library(pls)
+library(caret)
+library(DESeq2)
+library(tibble)
+library(plsVarSel)
+library(dplyr)
+library(tidyverse)
+
+colors = c("blue","lightblue",
+"yellow4", "yellow","darkorchid", "plum2",
+"darkred", "darksalmon","green4",
+"greenyellow","orange",
+"moccasin",   "hotpink4", "lightpink", "lightblue4", "lightcyan3",  "lightslateblue", "lightsteelblue1", "navy",
+"darkgray", "brown", "cornflowerblue","darkgoldenrod",
+"brown3","aliceblue","aquamarine",
+"beige","bisque","blue2","blueviolet","cyan","darkblue",
+"chocolate","aquamarine3","darkcyan","deeppink",
+"darkred","darkslateblue", "red", "green", "blue", "purple", "yellow", "brown",
+"black","gray","coral4","coral",
+"chartreuse3", "darkseagreen1","blue","lightblue",
+"yellow4", "yellow","darkorchid", "plum2",
+"darkred", "darksalmon","green4","black", "gray")
+#library(metabom8)
+
+```
+
+# load metabolite and growth data
+```{r import data}
+# CGE (CUE)
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+
+#select only cue column
+cue.only <- cue %>%
+  dplyr::select(SampleID, CUE.metric)
+
+#load lc-ms-data
+lc <- read.csv("../../qSIP-old-pipeline/qSIP_output/omics_datasets/lc-ms-hilic-t.csv", header = TRUE) %>% column_to_rownames(var = "X") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "SampleID")
+
+#merge lc-ms and cue-only
+lc.cue <- cue.only %>%
+  merge(lc, by = "SampleID", all = TRUE) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  filter(Timepoint != "t0" ) %>%
+  dplyr::select(-c(Plot, Moisture, Timepoint)) %>%
+  column_to_rownames(var = "SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  dplyr::select(-CUE.metric)
+
+
+```
+
+
+#PLSR and VIP selection
+```{r plsr-vip}
+# Fit model (uses cue.all created earlier in your workflow)
+m_full <- plsr(CUE.metric.log ~ ., data = lc.cue, scale = TRUE, validation = "LOO")
+m1     <- plsr(CUE.metric.log ~ ., data = lc.cue, scale = TRUE, ncomp = 1)
+
+# Helper to clean KO names
+.clean_Compounds <- function(x) gsub("[`']", "", x)
+
+# VIP (all KOs)
+VIP_df <- VIP(m1, opt.comp = 1) %>%
+  as.data.frame() %>%
+  setNames("VIP") %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_KO(Compounds))
+
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+p_df <- as.data.frame(m1$loadings) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .}
+rownames(p_df) <- VIP_df$Compounds
+
+p_df <- p_df %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_Compounds(Compounds)) %>%
+  { 
+    num_cols <- setdiff(names(.), "Compounds")
+    if (length(num_cols) == 0) tibble(Compounds = .$Compounds, P1 = NA_real_) else transmute(., Compounds, P1 = .data[[num_cols[1]]])
+  }
+
+w_df <- as.data.frame(m1$loading.weights) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .} 
+
+rownames(w_df) <- VIP_df$Compounds
+
+w_df <- w_df %>%
+  rownames_to_column("Compounds") %>%
+  mutate(Compounds = .clean_Compounds(Compounds)) %>%
+  { 
+    num_cols <- setdiff(names(.), "Compounds")
+    if (length(num_cols) == 0) tibble(Compounds = .$Compounds, W1 = NA_real_) else transmute(., Compounds, W1 = .data[[num_cols[1]]])
+  }
+
+q1 <- as.numeric(m1$Yloadings[1,1])
+
+b_vec <- as.vector(coef(m1)[,,1])
+Compounds_b  <- names(coef(m1)[,,1])
+b_df  <- tibble(Compounds = .clean_Compounds(Compounds_b), coef = as.numeric(b_vec))
+
+
+# Merge everything and compute a "proper" signed VIP using sign(W1 * q1)
+VIP_all <- VIP_df %>%
+  merge(p_df, by = "Compounds") %>%
+  merge(w_df, by = "Compounds") %>%
+  merge(b_df, by = "Compounds") %>%
+  mutate(
+    q1        = q1,
+    sign_eff  = dplyr::case_when(is.na(W1) | is.na(q1) ~ 1,
+                                 TRUE ~ sign(W1 * q1)),
+    VIP_signed = VIP * sign_eff
+  )
+
+
+
+colnames(VIP_all)[3:4] <- c("loading_comp1", "weight_comp1")
+
+# Top 10% threshold and vector of KOs (still based on magnitude of VIP)
+q_90    <- quantile(VIP_all$VIP, probs = 0.9, na.rm = TRUE)
+VIP_top <- VIP_all %>% filter(VIP > q_90) 
+
+vip_cpds <- VIP_top$Compounds
+
+# (Optional) inspect
+# head(VIP_all)
+# head(VIP_top)
+# Example: percent
+```
+
+
+```{r plot all cazy and lc-ms VIPs and comp}
+#load classifications
+kegg.brite <- read.csv("../../qSIP-old-pipeline/qSIP_output/LC-MS/classification-with-KEGG.csv", header = TRUE) %>% dplyr::select(-X)
+
+
+#merge VIP scores with KEGG classifications and components
+VIP.lc.kegg <- VIP_top %>%
+  merge(kegg.brite, by.x = "Compounds", by.y = "Query", all.x = TRUE) %>%
+  arrange(desc(VIP_signed)) %>%
+  mutate(Compounds, fct_reorder(Compounds, VIP_signed)) 
+
+
+write.csv(VIP.kegg, "../../qSIP_output/PLSR/combined_results_gr_1_lc-ms.csv")
+
+#plot VIP scores - superclass
+plot <- ggplot(VIP.lc.kegg, aes(x=factor(Compounds, levels = unique(Compounds)), y = VIP_signed, fill = superclass)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  xlab("KO IDs") +
+  ylab("VIP") +
+  scale_fill_manual(values = c(colors)) +
+  theme_bw() +
+    theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+          panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
+plot
+
+
+ggsave("../../Figures/PLSR/VIP-lc-combined-superclass.png", width = 8, height = 6, dpi = 300, units = "in")
+
+#plot VIP scores - class
+plot <- ggplot(VIP.lc.kegg, aes(x=factor(Compounds, levels = unique(Compounds)), y = VIP_signed, fill = class)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  xlab("KO IDs") +
+  ylab("VIP") +
+  scale_fill_manual(values = c(colors)) +
+  theme_bw() +
+    theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+          panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank())
+plot
+
+
+ggsave("../../Figures/PLSR/VIP-lc-combined-superclass.png", width = 8, height = 6, dpi = 300, units = "in")
+
+
+
+VIP.kegg.gr.1 <- VIP.kegg %>%
+  filter(VIP.sign > 1)
+
+VIP.gr.1 <- VIP.kegg.gr.1$Query
+
+VIP.kegg.lt.1 <- VIP.kegg %>%
+  filter(VIP.sign < 1)
+
+VIP.lt.1 <- VIP.kegg.lt.1$Query
+
+
+
+```
+
+
+```{r combined rp and hilic}
+VIP.hilic <- read.csv("../../qSIP_output/PLSR/combined_results_gr_1_lc-ms.csv", 
+                      header = TRUE) %>% 
+  dplyr::select(-X) %>% 
+  mutate(mode = "HILIC") %>% 
+  mutate(Query = str_replace(Query, "2,6-Pyridinedicarboxylic acid", 
+                             "2,6-Pyridinedicarboxylic acid ")) %>% 
+  arrange(desc(VIP.sign))
+
+VIP.rp <- read.csv("../../qSIP_output/PLSR/combined_results_gr_1_lc-ms-rp.csv", header = TRUE) %>% 
+  dplyr::select(-X) %>% 
+  mutate(mode = "RP") %>% 
+  arrange(desc(VIP.sign))
+
+VIP <- rbind(VIP.hilic, VIP.rp) 
+
+#plot superclass
+plot <- ggplot(VIP, aes(x=factor(Query, levels = unique(Query)), y = VIP.sign, fill = superclass)) +
+   geom_hline(yintercept = 1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_hline(yintercept = -1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_bar(stat = "identity", position = "dodge") +
+  xlab("Metabolite") +
+  ylab("VIP") +
+  scale_fill_manual(values = c(colors)) +
+   geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.8) +  
+  facet_wrap(~mode, ncol = 2, scales = "free") +
+  theme_bw() +
+  theme(text = element_text(size = 12),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+plot
+
+
+ggsave("../../Figures/PLSR/VIP-lc-combined-superclass-rp-hilic.png", width =12, height = 7, dpi = 300, units = "in")
+ggsave("../../Figures/PLSR/VIP-lc-combined-superclass-rp-hilic.pdf", width =10, height = 7, dpi = 300, units = "in")
+
+
+
+#plot class
+plot <- ggplot(VIP, aes(x=factor(Query, levels = unique(Query)), y = VIP.sign, fill = class)) +
+   geom_hline(yintercept = 1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_hline(yintercept = -1, linetype = "dotted", color = "black", size = 0.8) +
+  geom_bar(stat = "identity", position = "dodge") +
+  xlab("Metabolite") +
+  ylab("VIP") +
+  scale_fill_manual(values = c(colors)) +
+   geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.8) +  
+  facet_wrap(~mode, ncol = 2, scales = "free") +
+  theme_bw() +
+  theme(text = element_text(size = 12),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+plot
+
+
+ggsave("../../Figures/PLSR/VIP-lc-combined-class-rp-hilic.png", width =12, height = 7, dpi = 300, units = "in")
+ggsave("../../Figures/PLSR/VIP-lc-combined-class-rp-hilic.pdf", width =10, height = 7, dpi = 300, units = "in")
+
+
+```
+

@@ -1,0 +1,697 @@
+---
+title: "Fig 2- growth rates and CGE"
+author: "Linnea Honeker"
+date: "2024-07-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(stringr)
+library(cowplot)
+library(readxl)
+library(qvalue)
+library(WGCNA)
+library(nlme)
+library(emmeans)
+library(afex)
+library(tidymodels)
+library(lmerTest)
+
+
+moisture_col_list <- c("darkgreen", "brown")
+
+```
+
+## load CO2 ppm data
+
+```{r load data}
+
+
+#load co2 data frame
+df.0 <- read.csv("../data/CO2-ppm.csv", header = TRUE)
+
+#load biomass (16S copies / g soil) data
+source.df <- read.csv("../data/sample_source_biomass_info.csv", header = TRUE) %>% select(-X)
+
+#load soil moisture data
+sm.0 <- read.csv("../data/soil_moisture.csv")
+
+#load SIP efficiency
+SIP.0 <- read.csv("../data/qPCR_efficiency.csv")
+
+#reformat qSIP data to make mergable
+SIP <- SIP.0 %>%
+  separate(Samples, c("isotope", "timepoint", "moisture", "plot"), sep = "_") %>%
+  mutate(moisture = str_remove(moisture, "%")) %>%
+  mutate(x = "x") %>%
+  unite(moisture, c("x", "moisture"), sep = "", remove = TRUE) %>%
+  mutate(timepoint = str_remove(timepoint, "h")) %>%
+  mutate(t = "t") %>%
+  unite(timepoint, c("t", "timepoint"), sep = "", remove = TRUE) %>%
+  unite(SampleID, c("plot", "moisture", "timepoint"), remove = FALSE) %>%
+  filter(isotope == "12C+16O") %>%
+  mutate(SIP_efficiency = DNA_recovered_ng/DNA_loaded_ng) %>%
+  select(SampleID, SIP_efficiency)
+
+#reformat soil moisture data to make mergable
+sm <- sm.0 %>%
+  separate(Sample_Info, c("plot", "Isotope")) %>%
+  mutate(plot = str_replace(plot, "P3", "P03")) %>%
+  mutate(plot = str_replace(plot, "P4", "P04")) %>%
+  mutate(plot = str_replace(plot, "P8", "P08")) %>%
+  mutate(plot = str_replace(plot, "P9", "P09")) %>%
+  mutate(plot = str_replace(plot, "p", "P")) %>%
+  dplyr::select(-water_mass_after_wetup__g) %>%
+  dplyr::rename(sm_t0 = Soil_Moisture_pre_wetup) %>%
+  dplyr::rename(sm_rewet = soil_moisture_after_wetup) %>%
+  filter(Isotope == "12C") %>%
+  dplyr::select(-Isotope)
+
+#load growth rate data
+#load growth rate data to create trait table
+gr.lenient <- read.csv("../output/omics_datasets/rates-meta.csv", header = TRUE) %>%
+  dplyr::rename(moist_time = X)
+
+
+##make co2 df mergable with other data and merge, adjust copies.ul.total.tube by SIP_efficiency
+df <- df.0 %>%
+  separate(Sample_name, c("timepoint", "moisture", "plot"), sep = "_") %>%
+  mutate(moisture = str_remove(moisture, "%")) %>%
+  mutate(x = "x") %>%
+  unite(moisture, c("x", "moisture"), sep = "", remove = TRUE) %>%
+  mutate(timepoint = str_remove(timepoint, "h")) %>%
+  mutate(t = "t") %>%
+  unite(timepoint, c("t", "timepoint"), sep = "", remove = TRUE) %>%
+  unite(SampleID, c("plot", "moisture", "timepoint"), remove = FALSE) %>%
+  filter(plot != "") %>%
+  dplyr::select(-Plot) %>%
+  mutate(isotope = "16O") %>%
+  mutate(moisture = str_remove(moisture, "x")) %>%
+  unite(source, c("replicate", "timepoint", "isotope", "moisture")) %>%
+  merge(sm, by = "plot", all = TRUE) %>%
+  merge(source.df, by = "source", all.x = TRUE) %>%
+  merge(SIP, by = "SampleID", all.x = TRUE) %>%
+  mutate(copies.ul.total.tube.corr = SIP_efficiency * copies.ul.total.tube)
+  
+
+#merge with growth rate data
+df.final.gr.lenient <- df %>%
+  separate(SampleID, c("plot", "moisture", "timepoint"), sep = "_", remove = FALSE) %>%
+  unite(moist_time, c("moisture", "timepoint"), sep = "_", remove = FALSE) %>%
+  merge(gr.lenient, by = "moist_time", all.x = TRUE) %>%
+   dplyr::select(moist_time, SampleID, moisture,  CO2_ppm, CO2_ppm_h, copies.ul.total.tube.corr,
+        b.boot.median, d.boot.median, sm_t0, sm_rewet) %>%
+  mutate(CO2_ppm = as.numeric(CO2_ppm)) %>%
+  mutate(CO2_ppm_h = as.numeric(CO2_ppm_h))
+
+
+
+
+#calculate ratio of cummulative growth rate to cumulative CO2 ppm
+s=5 #5 g wet soil per vial, I think there were two vials per chamber?
+v=.490 #total volume of airspace in empty jar (L)
+w=.002 #volume of water added to jar (L)
+cv=.003 #volume for cryovials (L)
+d=1200 #(1.2 g / cm3 density of soil (or, 1.2*1000 = 1200 g / L)
+ex=1.2 #g wet soil that went into each extraction
+
+#notes on calculating moles of co2. first, must calculate moles of air using pv=nrt (or, N=pV/kT; assuming
+#p= 1atm, v = v, k = 8.314 / 6.022x10^23, t = 23 C; k=R/N or molar gas constant / Avogadro number [boltzmann constant])
+
+
+
+df.final.gr.lenient.CUE <- df.final.gr.lenient %>%
+  separate(SampleID, c("plot", "moisture", "timepoint"), sep = "_", remove = FALSE) %>%
+  mutate(timepoint.num = as.numeric(str_remove(timepoint, "t"))) %>%
+  mutate(b.boot.median.dry = b.boot.median * (1 + (sm_rewet/100))) %>% #adjust birth rates for soil moisture
+  mutate(d.boot.median.dry = d.boot.median * (1 + (sm_rewet/100))) %>% #adjust death rates for soil moisture
+  mutate(net.growth.copies.dry.g = b.boot.median.dry * (timepoint.num/24)) %>% #cumulative new growth
+  mutate(dead.copies.total.dry.g = d.boot.median.dry * (timepoint.num/24)) %>% #cumulative mortality
+  mutate(soil.g.dry.vial = case_when(
+    (timepoint == "t0") ~ (s / (1 + (sm_t0/100))),
+    (timepoint != "t0") ~ (s  / (1 + (sm_rewet/100)))
+    )) %>% #adjust soil mass for soil moisture to get dry weight for each vial
+  mutate(soil.g.dry.jar = soil.g.dry.vial * 2) %>% # dry soil in jar (contains two vials)
+  mutate(dry.weight.tube = case_when(
+    (timepoint == "t0") ~ (ex / (1 + (sm_t0/100))),
+    (timepoint != "t0") ~ (ex / (1 + (sm_rewet/100)))
+    )) %>% #adjust soil mass for soil moiature to get dry weight for the qPCR tube
+  mutate(copies.ul.total.g.dry = (copies.ul.total.tube.corr /dry.weight.tube))  %>% #get copies per dry weight
+  mutate(headspace.jar = v-((soil.g.dry.jar) / d) + w + cv) %>% #calculate volume of headspace
+  mutate(n.headspace.air.2 = (1 * headspace.jar)/(0.0821 * 273.15)) %>% #n = PV/RT (moles of air, this is correct)
+  mutate(CO2.moles.headspace = (n.headspace.air.2 * (CO2_ppm/10^6))) %>% #moles of CO2 in headspace
+  mutate(CO2.moles.g.dry = CO2.moles.headspace / soil.g.dry.jar) %>%
+  mutate(CUE.g.dry = net.growth.copies.dry.g / CO2.moles.g.dry) %>%
+  mutate(biomass.C.g.dry.g = ((net.growth.copies.dry.g * 10) / (5 * 10^15))) %>% #10 fg C / microbe; average 5 copies of 16S per microbe
+  mutate(CO2.g.g.dry = CO2.moles.g.dry * 12.01) %>% #12.01 = molar mass of carbon to convert moles to mass
+  mutate(CUE.real.g.dry = biomass.C.g.dry.g / (biomass.C.g.dry.g + CO2.g.g.dry))
+
+#filter out t0
+df.final.gr.lenient.CUE.no.t0 <- df.final.gr.lenient.CUE %>%
+  filter(timepoint != "t0")
+
+#determine max CUE
+max.CUE = max(as.numeric(df.final.gr.lenient.CUE.no.t0$CUE.g.dry))
+
+#convert CUE to CUE metric, a value between 0 and 1
+df.final.gr.lenient.CUE.2 <- df.final.gr.lenient.CUE.no.t0 %>%
+  mutate(CUE.metric = 1 - (max.CUE - CUE.g.dry)/max.CUE)
+
+  
+write.csv(df.final.gr.lenient.CUE.2, "../output/omics_datasets/cue_lenient.csv")
+
+read.csv( "../output/omics_datasets/cue_lenient.csv", header = TRUE)
+```
+
+
+
+```{r linear mixed models}
+
+#####CUEmetric
+#all rewet time points
+m <- lmer(CUE.metric ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                     Sum Sq  Mean Sq NumDF DenDF F value    Pr(>F)    
+# moisture           0.07752 0.077520     1     6   89.30 7.990e-05 ***
+# timepoint          0.39179 0.097947     4    24  112.83 3.403e-15 ***
+# moisture:timepoint 0.99446 0.248616     4    24  286.40 < 2.2e-16 ***
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ moisture | timepoint)
+pairs(em, adjust="tukey")
+
+# timepoint = t168:
+#  contrast   estimate     SE   df t.ratio p.value
+#  x100 - x50  0.27540 0.0486 8.19   5.669  0.0004
+# 
+# timepoint = t24:
+#  contrast   estimate     SE   df t.ratio p.value
+#  x100 - x50  0.00913 0.0486 8.19   0.188  0.8555
+# 
+# timepoint = t3:
+#  contrast   estimate     SE   df t.ratio p.value
+#  x100 - x50  0.86546 0.0486 8.19  17.814  <.0001
+# 
+# timepoint = t48:
+#  contrast   estimate     SE   df t.ratio p.value
+#  x100 - x50  0.70936 0.0486 8.19  14.601  <.0001
+# 
+# timepoint = t72:
+#  contrast   estimate     SE   df t.ratio p.value
+#  x100 - x50  0.26057 0.0486 8.19   5.363  0.0006
+# 
+# Degrees-of-freedom method: kenward-roger 
+
+#####CO2 per g dry soil
+#all rewet time points
+m <- lmer(CO2.moles.g.dry ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+anova(m)
+
+#Type III Analysis of Variance Table with Satterthwaite's method
+#                       Sum Sq    Mean Sq NumDF   DenDF  F value Pr(>F)
+#moisture           2.0900e-13 2.0870e-13     1 0.10973   0.8352 0.8299
+#timepoint          1.0165e-10 2.5413e-11     4 0.11289 101.6753 0.6654
+#moisture:timepoint 5.1300e-13 1.2820e-13     4 0.11289   0.5130 0.8917
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ moisture | timepoint)
+pairs(em, adjust="tukey")
+
+
+#####bnet growth
+#all rewet time points
+m <- lmer(net.growth.copies.dry.g ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+anova(m)
+#Type III Analysis of Variance Table with Satterthwaite's method
+#                       Sum Sq    Mean Sq NumDF DenDF F value    Pr(>F)    
+#moisture           1.0754e+17 1.0754e+17     1     4   45374 2.914e-09 ***
+#timepoint          1.8006e+18 4.5014e+17     4   Inf  189922 < 2.2e-16 ***
+#moisture:timepoint 6.8477e+17 1.7119e+17     4   Inf   72228 < 2.2e-16 ***
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ moisture | timepoint)
+pairs(em, adjust="tukey")
+
+######btotal qPCR copies 
+##all rewet time points
+m <- lmer(copies.ul.total.g.dry ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                        Sum Sq    Mean Sq NumDF      DenDF F value    Pr(>F)    
+# moisture           1.9057e+18 1.9057e+18     1 2.1122e+49 45.1320 1.842e-11 ***
+# timepoint          3.1892e+17 6.3785e+16     5        Inf  1.5106    0.1826    
+# moisture:timepoint 2.4191e+17 4.8383e+16     5        Inf  1.1459    0.3335 
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ moisture | timepoint)
+pairs(em, adjust="tukey")
+
+# timepoint = t0:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 3.26e+08 1.68e+08 24   1.941  0.0641
+# 
+# timepoint = t168:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 5.45e+08 1.68e+08 24   3.249  0.0034
+# 
+# timepoint = t24:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 6.01e+08 1.68e+08 24   3.585  0.0015
+# 
+# timepoint = t3:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 6.33e+08 1.68e+08 24   3.771  0.0009
+# 
+# timepoint = t48:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 1.68e+08 1.68e+08 24   1.000  0.3273
+# 
+# timepoint = t72:
+#  contrast   estimate       SE df t.ratio p.value
+#  x100 - x50 4.88e+08 1.68e+08 24   2.911  0.0077
+
+##birth rates, all timepoints
+m <- lmer(b.boot.median.dry ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                        Sum Sq    Mean Sq NumDF DenDF F value    Pr(>F)    
+# moisture           7.4774e+17 7.4774e+17     1     6  120761 3.832e-14 ***
+# timepoint          5.7512e+18 1.4378e+18     4   Inf  232204 < 2.2e-16 ***
+# moisture:timepoint 4.7253e+18 1.1813e+18     4   Inf  190787 < 2.2e-16 ***
+
+##mortality rates, all timepoints
+m <- lmer(d.boot.median.dry ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+anova(m)
+# #Type III Analysis of Variance Table with Satterthwaite's method
+#                        Sum Sq    Mean Sq NumDF DenDF F value    Pr(>F)    
+# moisture           3.3724e+19 3.3724e+19     1     6  204777  7.86e-15 ***
+# timepoint          1.4269e+20 3.5673e+19     4   Inf  216606 < 2.2e-16 ***
+# moisture:timepoint 1.3509e+20 3.3772e+19     4   Inf  205065 < 2.2e-16 ***
+```
+
+
+```{r plot CO2 ppm}
+###############CO2 efflux (same for lenient and strict)################
+plot <- df.final.gr.lenient.CUE %>%
+  group_by(moisture, timepoint) %>%
+   filter(timepoint != "t0") %>%
+  summarise(mean = mean(CO2.moles.g.dry),
+            sd = sd(CO2.moles.g.dry),
+            se = sd/sqrt(n())) %>%
+   mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                width = 4) +
+    ylab(~CO[2]*' efflux (moles'* ~CO[2]~g-soil^-1*')') +
+    scale_y_log10() +
+       geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/CO2-volume-dry-weight.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/CO2-volume-dry-weight.pdf", dpi = 300, width = 4, height = 4, units = "in")
+
+#calculate fit, separate out moisture treatments first
+df.50 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x50" &
+           timepoint.num != 0)
+summary(lm(df.50$CO2.moles.g.dry ~ log(df.50$timepoint.num)) )
+
+# Call:
+# lm(formula = df.50$CO2.moles.g.dry ~ log(df.50$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -1.378e-06 -9.078e-07 -2.887e-07  4.459e-07  3.134e-06 
+# 
+# Coefficients:
+#                            Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)              -1.187e-06  7.593e-07  -1.563    0.136    
+# log(df.50$timepoint.num)  1.138e-06  2.017e-07   5.641 2.37e-05 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.227e-06 on 18 degrees of freedom
+# Multiple R-squared:  0.6387,	Adjusted R-squared:  0.6186 
+# F-statistic: 31.82 on 1 and 18 DF,  p-value: 2.371e-05
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x100" &
+           timepoint.num != 0)
+summary(lm(df.100$CO2.moles.g.dry ~ log(df.100$timepoint.num)) )
+
+# Call:
+# lm(formula = df.100$CO2.moles.g.dry ~ log(df.100$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -1.034e-06 -7.937e-07 -3.743e-07  6.405e-07  2.576e-06 
+# 
+# Coefficients:
+#                             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)               -1.365e-06  6.197e-07  -2.202    0.041 *  
+# log(df.100$timepoint.num)  1.101e-06  1.646e-07   6.687 2.85e-06 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.001e-06 on 18 degrees of freedom
+# Multiple R-squared:  0.713,	Adjusted R-squared:  0.697 
+# F-statistic: 44.71 on 1 and 18 DF,  p-value: 2.849e-06
+
+
+```
+
+```{r lenient growth rate calculations}
+#########lenient growth rate calculations########################
+###birth rates#####
+plot <- df.final.gr.lenient.CUE %>%
+  group_by(moisture, timepoint) %>%
+  filter(timepoint != "t0") %>%
+  summarise(mean = mean(b.boot.median.dry),
+            sd = sd(b.boot.median.dry),
+            se = sd/sqrt(n())) %>%
+  mutate(log.mean = log10(mean)) %>%
+  mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  mutate(log.time = log10(timepoint)) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  ylab(bquote('birth rates (16S copies '* ~g-soil^-1~hr^-1*')')) +
+  xlab("timepoint (h)") +
+  #geom_errorbar(aes(ymin = mean-se, ymax = mean+se)) +
+  scale_y_log10() +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/growth_rates_dry_lenient.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/growth_rates_dry_lenient.pdf", dpi = 300, width = 4, height = 4, units = "in")
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x100" &
+           timepoint.num != 0)
+summary(lm(df.100$b.boot.median.dry ~ log(df.100$timepoint.num)) )
+# Call:
+# lm(formula = df.100$b.boot.median.dry ~ log(df.100$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -571043407  -14873313    6747783  282423349  301641418 
+# 
+# Coefficients:
+#                             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)               2312074495  204664114  11.297 1.33e-09 ***
+# log(df.100$timepoint.num) -476824989   54374264  -8.769 6.47e-08 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 330700000 on 18 degrees of freedom
+# Multiple R-squared:  0.8103,	Adjusted R-squared:  0.7998 
+# F-statistic:  76.9 on 1 and 18 DF,  p-value: 6.472e-08
+
+df.50 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x50" &
+           timepoint.num != 0)
+summary(lm(df.50$b.boot.median.dry ~ log(df.50$timepoint.num)) )
+# Call:
+# lm(formula = df.50$b.boot.median.dry ~ log(df.50$timepoint.num))
+# 
+# Residuals:
+#       Min        1Q    Median        3Q       Max 
+# -45812295 -24616170 -18578317  15872363  73592135 
+# 
+# Coefficients:
+#                           Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)              292164210   26931142  10.849 2.51e-09 ***
+# log(df.50$timepoint.num) -41379980    7154948  -5.783 1.76e-05 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 43520000 on 18 degrees of freedom
+# Multiple R-squared:  0.6501,	Adjusted R-squared:  0.6307 
+# F-statistic: 33.45 on 1 and 18 DF,  p-value: 1.761e-05
+
+###mortality rates#####
+plot <- df.final.gr.lenient.CUE %>%
+  group_by(moisture, timepoint) %>%
+  filter(timepoint != "t0") %>%
+  summarise(mean = mean(-d.boot.median.dry),
+            sd = sd(-d.boot.median.dry),
+            se = sd/sqrt(n())) %>%
+  mutate(log.mean = -log10(abs(mean))) %>%
+  mutate(mean.log = -log10(abs(mean))) %>%
+  mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+    mutate(log.time = log10(timepoint)) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  ylab(bquote('mortality rates (16S copies '* ~g-soil^-1~hr^-1*')')) +
+  xlab("timepoint (h)") +
+  scale_y_log10() +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/death_rates_dry_lenient.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/death_rates_dry_lenient.pdf", dpi = 300, width = 4, height = 4, units = "in")
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x100" &
+           timepoint.num != 0)
+summary(lm(df.100$d.boot.median.dry ~ log(df.100$timepoint.num)) )
+#Call:
+# lm(formula = df.100$d.boot.median.dry ~ log(df.100$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -2.019e+09 -1.581e+09  9.002e+07  8.661e+08  2.617e+09 
+# 
+# Coefficients:
+#                             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)               -1.073e+10  1.095e+09  -9.801 1.22e-08 ***
+# log(df.100$timepoint.num)  2.446e+09  2.908e+08   8.412 1.19e-07 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 1.769e+09 on 18 degrees of freedom
+# Multiple R-squared:  0.7972,	Adjusted R-squared:  0.7859 
+# F-statistic: 70.76 on 1 and 18 DF,  p-value: 1.19e-07
+
+df.50 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x50" &
+           timepoint.num != 0)
+summary(lm(df.50$d.boot.median.dry ~ log(df.50$timepoint.num)) )
+# Call:
+# lm(formula = df.50$d.boot.median.dry ~ log(df.50$timepoint.num))
+# 
+# Residuals:
+#       Min        1Q    Median        3Q       Max 
+# -29833308 -22699472   4180890   9648284  38472041 
+# 
+# Coefficients:
+#                            Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)              -146521029   15932362  -9.196 3.19e-08 ***
+# log(df.50$timepoint.num)   32974378    4232840   7.790 3.57e-07 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 25740000 on 18 degrees of freedom
+# Multiple R-squared:  0.7712,	Adjusted R-squared:  0.7585 
+# F-statistic: 60.69 on 1 and 18 DF,  p-value: 3.571e-07
+
+
+###cumulative new biomass#####
+plot <- df.final.gr.lenient.CUE %>%
+  mutate(moisture = as.factor(moisture)) %>%
+  filter(timepoint != "t0") %>%
+  group_by(moisture, timepoint) %>%
+  summarise(mean = mean(net.growth.copies.dry.g),
+            sd = sd(net.growth.copies.dry.g),
+            se = sd/sqrt(n())) %>%
+  mutate(log.mean = log10(mean)) %>%
+   mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  ylab(bquote('net new growth (16S copies '* ~g-soil^-1*')')) +
+  xlab("timepoint (h)") +
+  scale_y_log10(limits = c(2.5e7, 1.5e9)) +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/cumulative-biomass-lenient-g-dry-soil.png", dpi = 300, width =4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/cumulative-biomass-lenient-g-dry-soil.pdf", dpi = 300, width =4, height = 4, units = "in")
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x100" &
+           timepoint.num != 0)
+summary(lm(df.100$net.growth.copies.dry.g ~ log(df.100$timepoint.num)) )
+# Call:
+# lm(formula = df.100$net.growth.copies.dry.g ~ log(df.100$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -375963680  -83923479  131504264  142227950  187665744 
+# 
+# Coefficients:
+#                             Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)               -139640357  136267869  -1.025    0.319    
+# log(df.100$timepoint.num)  233243262   36203050   6.443 4.61e-06 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 220200000 on 18 degrees of freedom
+# Multiple R-squared:  0.6975,	Adjusted R-squared:  0.6807 
+# F-statistic: 41.51 on 1 and 18 DF,  p-value: 4.611e-06
+
+df.50 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x50" &
+           timepoint.num != 0)
+summary(lm(df.50$net.growth.copies.dry.g ~ log(df.50$timepoint.num)) )
+
+# Call:
+# lm(formula = df.50$net.growth.copies.dry.g ~ log(df.50$timepoint.num))
+# 
+# Residuals:
+#        Min         1Q     Median         3Q        Max 
+# -114936747   14236312   14845997   20397470   66754509 
+# 
+# Coefficients:
+#                           Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)              -95610786   39250337  -2.436   0.0255 *  
+# log(df.50$timepoint.num)  98902361   10427858   9.484    2e-08 ***
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 63420000 on 18 degrees of freedom
+# Multiple R-squared:  0.8333,	Adjusted R-squared:  0.824 
+# F-statistic: 89.95 on 1 and 18 DF,  p-value: 2.004e-08
+
+
+#CUE metric (value 0 to 1)
+plot <- df.final.gr.lenient.CUE.2 %>%
+  mutate(moisture = as.factor(moisture)) %>%
+  group_by(moisture, timepoint) %>%
+  summarise(mean = mean(CUE.metric),
+            sd = sd(CUE.metric),
+            se = sd/sqrt(n())) %>%
+   mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                width = 4) +
+  ylab('CGE metric') +
+  scale_y_log10() +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/normalized-ratio-biomass-CO2.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/normalized-ratio-biomass-CO2.pdf", dpi = 300, width = 4, height = 4, units = "in")
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE.2 %>%
+  filter(moisture == "x100" )
+summary(lm(df.100$CUE.metric ~ log(df.100$timepoint.num)) )
+
+#Call:
+# lm(formula = df.100$CUE.metric ~ log(df.100$timepoint.num))
+# 
+# Residuals:
+#      Min       1Q   Median       3Q      Max 
+# -0.39362 -0.12611  0.02621  0.11672  0.37681 
+# 
+# Coefficients:
+#                           Estimate Std. Error t value Pr(>|t|)    
+# (Intercept)                0.98480    0.14157   6.956 1.69e-06 ***
+# log(df.100$timepoint.num) -0.11055    0.03761  -2.939  0.00877 ** 
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 0.2288 on 18 degrees of freedom
+# Multiple R-squared:  0.3243,	Adjusted R-squared:  0.2868 
+# F-statistic: 8.639 on 1 and 18 DF,  p-value: 0.00877
+
+df.50 <- df.final.gr.lenient.CUE.2 %>%
+  filter(moisture == "x50")
+summary(lm(df.50$CUE.metric ~ log(df.50$timepoint.num)) )
+
+#Call:
+# lm(formula = df.50$CUE.metric ~ log(df.50$timepoint.num))
+# 
+# Residuals:
+#      Min       1Q   Median       3Q      Max 
+# -0.10052 -0.05224 -0.01816  0.05290  0.17668 
+# 
+# Coefficients:
+#                          Estimate Std. Error t value Pr(>|t|)  
+# (Intercept)               0.10962    0.05092   2.153   0.0452 *
+# log(df.50$timepoint.num)  0.01801    0.01353   1.331   0.1997  
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# 
+# Residual standard error: 0.08229 on 18 degrees of freedom
+# Multiple R-squared:  0.08962,	Adjusted R-squared:  0.03905 
+# F-statistic: 1.772 on 1 and 18 DF,  p-value: 0.1997
+
+
+#total biomass
+plot <- df.final.gr.lenient.CUE %>%
+  mutate(moisture = as.factor(moisture)) %>%
+  group_by(moisture, timepoint) %>%
+  filter(SampleID != "P09_x50_t72") %>%
+  filter(!is.na(copies.ul.total.g.dry)) %>%
+  # filter(timepoint != "t0") %>%
+  #mutate(log.mean = log10(copies.ul.total.g.dry)) %>%
+  summarise(mean = mean(copies.ul.total.g.dry),
+            sd = sd(copies.ul.total.g.dry),
+            se = sd/sqrt(n())) %>%
+  mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  ylab(bquote('total biomass (16S copies '* ~g-soil^-1*')')) +
+  xlab("timepoint (h)") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                width = 4) +
+  #geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ poly(x,3)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/total-biomass-g-dry.png", dpi = 300, width =4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/total-biomass-g-dry.pdf", dpi = 300, width =4, height = 4, units = "in")
+
+
+#calculate fit, separate out moisture treatments first
+df.100 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x100" &
+           timepoint.num != 0)
+summary(lm(df.100$copies.ul.total.g.dry ~ df.100$timepoint.num))
+#no trend
+
+df.50 <- df.final.gr.lenient.CUE %>%
+  filter(moisture == "x50" &
+           timepoint.num != 0)
+summary(lm(df.50$copies.ul.total.g.dry ~ df.50$timepoint.num) )
+#no trend
+
+```
+

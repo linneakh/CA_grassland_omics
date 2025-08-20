@@ -1,0 +1,1129 @@
+---
+title: "PLS"
+author: "Linnea Honeker"
+date: "2/26/24"
+output: html_document
+email: linneah@arizona.edu
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.retina = 2)
+
+# Core
+library(tidyverse)
+library(ggplot2)
+library(pls)
+library(plsVarSel)
+
+# Extras
+library(viridis)
+library(viridisLite)
+library(patchwork)
+library(WGCNA)   # for corPvalueStudent
+library(grid)    # for unit()
+
+set.seed(123)
+# Aesthetics ---------------------------------------------------------------
+shapes_moisture <- c(x50 = 17, x100 = 16)
+
+col_list_moisture <- c("darkgreen", "brown")
+
+source("../scripts/PLSR-functions.R")
+
+out_dir = "../figures/Fig5-PLSR/10/"
+out_dir_deg = "../figures/FigS4-PLSR/10/"
+
+r = 300
+w = 3.25
+h = 3
+w2 = 4
+
+```
+
+# Data import & preparation
+```{r import data}
+# CGE (CUE)
+cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+
+# Gene expression (VST, KO-level)
+datExpr.0b <- read.csv("../output/metaT/vst-ko-no-t0.csv", header = TRUE)
+datExpr <- datExpr.0b %>% tibble::column_to_rownames(var = "X") %>% mutate(across(everything(), as.numeric))
+
+# Merge cue + expression
+datExpr.cue <- datExpr %>% t() %>% as.data.frame() %>% tibble::rownames_to_column("SampleID")
+cue.all <- cue.only %>%
+  merge(datExpr.cue, by = "SampleID") %>%
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
+  dplyr::select(-Plot, -Moisture, -Timepoint) %>%
+  tibble::column_to_rownames("SampleID") %>%
+  mutate(CUE.metric.log = log(CUE.metric)) %>%
+  dplyr::select(-CUE.metric)
+
+cue.timepoint <- cue.all %>% 
+  tibble::rownames_to_column("SampleID") %>% 
+  tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE)
+
+```
+
+
+#PLSR and VIP selection
+```{r plsr-vip}
+# Fit model (uses cue.all created earlier in your workflow)
+m_full <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, validation = "LOO")
+m1     <- plsr(CUE.metric.log ~ ., data = cue.all, scale = TRUE, ncomp = 1)
+
+# Helper to clean KO names
+.clean_KO <- function(x) gsub("[`']", "", x)
+
+# VIP (all KOs)
+VIP_df <- VIP(m1, opt.comp = 1) %>%
+  as.data.frame() %>%
+  setNames("VIP") %>%
+  rownames_to_column("KO") %>%
+  mutate(KO = .clean_KO(KO))
+
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+# Extract X-loadings (p), X-weights (w), Y-loading (q1), and coefficients (b)
+# Normalize column names to remove spaces so we can reference Comp1 reliably
+p_df <- as.data.frame(m1$loadings) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .}
+rownames(p_df) <- VIP_df$KO
+
+p_df <- p_df %>%
+  rownames_to_column("KO") %>%
+  mutate(KO = .clean_KO(KO)) %>%
+  { 
+    num_cols <- setdiff(names(.), "KO")
+    if (length(num_cols) == 0) tibble(KO = .$KO, P1 = NA_real_) else transmute(., KO, P1 = .data[[num_cols[1]]])
+  }
+
+w_df <- as.data.frame(m1$loading.weights) %>%
+  {colnames(.) <- gsub("\\s+", "", colnames(.)); .} 
+
+rownames(w_df) <- VIP_df$KO
+
+w_df <- w_df %>%
+  rownames_to_column("KO") %>%
+  mutate(KO = .clean_KO(KO)) %>%
+  { 
+    num_cols <- setdiff(names(.), "KO")
+    if (length(num_cols) == 0) tibble(KO = .$KO, W1 = NA_real_) else transmute(., KO, W1 = .data[[num_cols[1]]])
+  }
+
+q1 <- as.numeric(m1$Yloadings[1,1])
+
+b_vec <- as.vector(coef(m1)[,,1])
+KO_b  <- names(coef(m1)[,,1])
+b_df  <- tibble(KO = .clean_KO(KO_b), coef = as.numeric(b_vec))
+
+
+# Merge everything and compute a "proper" signed VIP using sign(W1 * q1)
+VIP_all <- VIP_df %>%
+  merge(p_df, by = "KO") %>%
+  merge(w_df, by = "KO") %>%
+  merge(b_df, by = "KO") %>%
+  mutate(
+    q1        = q1,
+    sign_eff  = dplyr::case_when(is.na(W1) | is.na(q1) ~ 1,
+                                 TRUE ~ sign(W1 * q1)),
+    VIP_signed = VIP * sign_eff
+  )
+
+
+
+colnames(VIP_all)[3:4] <- c("loading_comp1", "weight_comp1")
+
+# Top 10% threshold and vector of KOs (still based on magnitude of VIP)
+q_90    <- quantile(VIP_all$VIP, probs = 0.9, na.rm = TRUE)
+VIP_top <- VIP_all %>% filter(VIP > q_90)
+
+vip_kos <- VIP_top$KO
+
+# (Optional) inspect
+# head(VIP_all)
+# head(VIP_top)
+# Example: percent variance explained (printed in console)
+# summary(m_full)
+```
+
+
+
+
+# Curated KO lists
+
+```{r curated}
+# KEGG annotations (optional downstream)
+kegg.brite <- read.csv("../output/KEGG/Kegg_brite_all.csv") %>% dplyr::select(-any_of("X"))
+
+# Biosynthesis
+aa.biosynthesis    <- read.csv("../data/curated_ko_lists/biosynthesis_aa.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+lipid.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_lipid.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+nuc.biosynthesis   <- read.csv("../data/curated_ko_lists/biosynthesis_nucleotides_LH.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+wall.biosynthesis  <- read.csv("../data/curated_ko_lists/biosynthesis_cell_wall.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+teich.biosynthesis <- read.csv("../data/curated_ko_lists/biosynthesis_teichoic.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+eps.biosynthesis   <- read.csv("../data/curated_ko_lists/biosynthesis_eps.csv")  %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+# Energy
+central <- read.csv("../data/curated_ko_lists/energy_central.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+ferm <- read.csv("../data/curated_ko_lists/energy_fermentation.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+pomp <- read.csv("../data/curated_ko_lists/energy_pomp.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+atp <- read.csv("../data/curated_ko_lists/energy-atp.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+pyrox <- read.csv("../data/curated_ko_lists/energy_pyruvate_oxidation.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+etc <- read.csv("../data/curated_ko_lists/energy-etc.csv") %>% 
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+# Degradation
+aa.deg <- read.csv("../data/curated_ko_lists/degradation_aa_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+lipid.deg <- read.csv("../data/curated_ko_lists/degradation_lipids_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+nuc.deg <- read.csv("../data/curated_ko_lists/degradation_nucleotides_LH.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "") 
+
+aromatic.deg <- read.csv("../data/curated_ko_lists/degradation_aromatics.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+ring.deg <- read.csv("../data/curated_ko_lists/degradation_rings.csv") %>%
+  mutate(KO = str_replace(KO, "k", "K")) %>% 
+  filter(KO != "")
+
+#co2 releasing
+co2 <- read.csv("../data/curated_ko_lists/CO2_releasing_KOs_core_set.csv")
+
+
+
+```
+
+```{r vip-curated-summary, message=FALSE, warning=FALSE}
+##Biosynthesis
+aa.biosynthesis.merge <- aa.biosynthesis %>%
+  mutate(Subpathway = case_when(
+    grepl("ser", Shared2) ~ "Amino acid biosynthesis: Serine",
+    grepl("lys/met", Shared2) ~ "Amino acid biosynthesis: Lysine/methionine",
+    grepl("tryptophan", Shared2) ~ "Amino acid biosynthesis: Tryptophan",
+    grepl("alanine", Shared2) ~ "Amino acid biosynthesis: Alanine",
+    grepl("cys", Shared2) ~ "Amino acid biosynthesis: Cysteine",
+    grepl("glyc", Shared2) ~ "Amino acid biosynthesis: Glycine",
+    grepl("chorismate", Shared2) ~ "Amino acid biosynthesis: Chorismate", 
+    TRUE ~ "Amino acid bioysnthesis: shared or other"
+  )) %>%
+  select(Biomolecule, KO, Subpathway) %>%
+    mutate(Biomolecule = "Amino acid biosynthesis")
+
+lipid.biosynthesis.merge <- lipid.biosynthesis %>%
+  mutate(Subpathway = case_when(
+    grepl("Fatty acid", Shared) ~ "Lipid biosynthesis: Fatty acid",
+    grepl("glycerol", Shared) ~ "Lipid biosynthesis: Glycerolipid",
+    grepl("main", Shared) ~ "Lipid biosynthesis: Glycerophospholipid"
+  )) %>%
+  select(Biomolecule, KO, Subpathway) %>%
+    mutate(Biomolecule = "Lipid biosynthesis")
+
+nuc.biosynthesis.merge <- nuc.biosynthesis %>%
+  mutate(Subpathway = case_when(
+    grepl("Purine", Shared) ~ "Nucleotide biosynthesis: purine",
+    grepl("pyrimidine", Shared) ~ "Nucleotide biosynthesis: pyrimidine",
+    grepl("ribonucleotide reductase", Shared) ~ "Nucleotide biosynthesis: ribonucleotide"
+  )) %>%
+  select(Biomolecule, KO, Subpathway) %>%
+  mutate(Biomolecule = "Nucleotide biosynthesis")
+
+eps.biosynthesis.merge <- eps.biosynthesis %>%
+  mutate(Subpathway = case_when(
+    grepl("alginate", Shared2) ~ "EPS biosynthesis: Alginate",
+    grepl("acetan", Shared2) ~ "EPS biosynthesis: Acetan/xanthan"
+  )) %>%
+  select(Biomolecule, KO, Subpathway) %>%
+  mutate(Biomolecule = "EPS biosynthesis")
+
+teich.biosynthesis.merge <- teich.biosynthesis %>%
+  select(Biomolecule, KO) %>%
+  mutate(Biomolecule = "Teichoic acid biosynthesis") %>%
+  mutate(Subpathway = "Teichoic acid biosynthesis: from UND-PP to wall teichoic acid")
+
+wall.biosynthesis.merge <- wall.biosynthesis %>%
+  mutate(Subpathway = case_when(
+    grepl("aminosugar", Shared) ~ "Peptidoglycan biosynthesis: Aminosugar production",
+    grepl("remodeling", Shared) ~ "Peptidoglycan biosynthesis: Remodeling",
+    grepl("PG", Shared) ~ "Peptidoglycan biosynthesis: Peptidoglycan unit synthesis"
+  )) %>%
+  select(Biomolecule, KO, Subpathway) 
+  
+biosynthesis <- rbind(aa.biosynthesis.merge, lipid.biosynthesis.merge, 
+                      nuc.biosynthesis.merge, eps.biosynthesis.merge,
+                      teich.biosynthesis.merge, wall.biosynthesis.merge) %>%
+  rename(Pathway = Biomolecule) %>%
+  mutate(Metabolism = "Biosynthesis") %>%
+  select(KO, Metabolism, Pathway, Subpathway)
+
+
+##Energy
+central.merge <- central %>%
+  select(KO, Metabolism, Shared, Shared2) %>%
+  unite(Metabolism, c("Metabolism", "Shared", "Shared2"), sep = "_") %>%
+  mutate(Metabolism2 = case_when(
+    grepl("Citrate cycle", Metabolism) ~ "Central C metabolism: TCA cycle",
+    grepl("Pentose", Metabolism) ~ "Central C metabolism: PPP",
+    grepl("Glycolysis", Metabolism) ~ "Central C metabolism: Glycolysis/Gluconeogenesis",
+    grepl("Pyruvate", Metabolism) ~ "Central C metabolism: Pyruvate oxidation",
+    grepl("Entner-Doudoroff pathway", Metabolism) ~ "Central C metabolism: ED pathway",
+    grepl("glyoxylate", Metabolism) ~ "Central C metabolism: Glyoxylate shunt and acetate consumption",
+    grepl("shared", Metabolism) & grepl("tca/glyc", Metabolism) ~ "Central C metabolism: TCA cycle and Glycolysis",
+    grepl("shared", Metabolism) & grepl("TCA/glyc", Metabolism) ~ "Central C metabolism: TCA cycle and Glycolysis",
+   grepl("shared", Metabolism) & grepl("glyc/ed", Metabolism) ~ "Central C metabolism: Glycolysis and ED pathway",
+  )) %>%
+  select(-Metabolism) %>%
+  rename(Subpathway = Metabolism2) %>%
+  mutate(Pathway= "Central metabolism")
+
+atp.merge <- atp %>%
+  mutate(Subpathway = paste("ATPase: ", Shared2, sep = "")) %>%
+  mutate(Pathway = "ATPase") %>%
+  select(KO, Pathway, Subpathway)
+
+pomp.merge <- pomp %>%
+  unite(Subpathway, c(Metabolism, Shared2), sep = ": ", remove = FALSE) %>%
+  rename(Pathway = Metabolism) %>%
+  select(KO, Pathway, Subpathway)
+  
+
+ferm.merge <- ferm %>%
+  mutate(Shared = case_when(
+    Shared == "shared" ~ paste("to", Shared2, sep = " "),
+    TRUE ~ Shared)) %>%
+  mutate(Pathway = "Fermentation") %>%
+  unite(Subpathway, c(Pathway, Shared), sep = ": ", remove = FALSE) %>%
+  select(KO, Pathway, Subpathway)
+
+pyrox.merge <- pyrox %>%
+  mutate(Pathway = "Pyruvate oxidation") %>%
+  mutate(Subpathway = "Pyruvate oxidation: Pyruvate => acetyl-CoA") %>%
+  select(KO, Pathway, Subpathway)
+
+etc.merge <- etc %>%
+  mutate(Pathway = "Electron transport chain") %>%
+  mutate(Subpathway = case_when(
+    Shared == "nadh reductase" ~ "ETC: NADH reductase",
+    Shared == "cyt c ox" ~ "ETC: Cytochrome C oxidase"
+  )) %>%
+  select(KO, Pathway, Subpathway)
+
+energy <- rbind(central.merge, atp.merge, 
+                      pomp.merge, ferm.merge,
+                      pyrox.merge,
+                      etc.merge) %>%
+  mutate(Metabolism = "Energy") %>%
+  select(KO, Metabolism, Pathway, Subpathway)
+
+##Degradation
+aro.deg.merge <- aromatic.deg %>%
+  mutate(Pathway = "Xenobiotics degradation") %>%
+  mutate(Subpathway = case_when(
+    grepl("shared", Subpathway) ~ "Xenobiotics degradation: Shared",
+    grepl("Benzoate", Subpathway) ~ "Xenobiotics degradation: Benzoate",
+    grepl("Aminobenzoate", Subpathway) ~ "Xenobiotics degradation: Aminobenzoate",
+    grepl("Chlorocyclohexane", Subpathway) ~ "Xenobiotics degradation: Chlorocyclohexane and chlorobenzene",
+    grepl("Nitrotoluene", Subpathway) ~ "Xenobiotics degradation: Nitrotoluene",
+    grepl("Styrene", Subpathway) ~ "Xenobiotics degradation: Styrene",
+    grepl("Atrazine", Subpathway) ~ "Xenobiotics degradation: Atrazine",
+    grepl("Caprolactam", Subpathway) ~ "Xenobiotics degradation: Caprolactam",
+    grepl("Naphthalene", Subpathway) ~ "Xenobiotics degradation: Naphthalene",
+    grepl("Furfural", Subpathway) ~ "Xenobiotics degradation: Furfural",
+    grepl("Steroid", Subpathway) ~ "Xenobiotics degradation: Steroid",
+  )) %>%
+  select(KO, Pathway, Subpathway)
+
+ring.deg.merge <- ring.deg %>%
+  mutate(Pathway = "Aromatic ring degradation") %>%
+  mutate(Subpathway = case_when(
+    grepl("Ortho-cleavage of dihydroxylated", Subpathway) ~ "Aromatic ring degradation: Ortho-cleavage of dihydroxylated aromatic ring",
+    grepl("Ortho-cleavage of halogenated", Subpathway)  ~ "Aromatic ring degradation: Ortho-cleavage of halogenated aromatic ring",
+    grepl("others", Subpathway) ~ "Aromatic ring degradation: Other pathway",
+    grepl("type3", Subpathway) ~ "Aromatic ring degradation: Dihyroxylation of aromatic ring",
+    grepl("meta-cleavage", Subpathway) ~ "Aromatic ring degradation: Dihyroxylation and meta-cleavage of aromatic ring",
+    grepl("polycyclic", Subpathway) ~ "Aromatic ring degradation: Ring removal from polycyclic aromatic ring",
+    grepl("monooxygenase", Subpathway) ~ "Aromatic ring degradation: Dihydroxylation of aromatic ring"
+  )) %>%
+  select(KO, Pathway, Subpathway)
+
+nuc.deg.merge <- nuc.deg %>%
+  mutate(Subpathway = case_when(
+    grepl("purine", Subpathway) ~ "Nucleotide degradation: purine",
+    grepl("pyrimidine", Subpathway) ~ "Nucleotide degradation: pyrimidine"
+  )) %>%
+  mutate(Pathway = "Nucleotide degradation") %>%
+  select(KO, Pathway, Subpathway)
+
+lipid.deg.merge <- lipid.deg %>%
+  mutate(Pathway = "Lipid degradation") %>%
+  mutate(Subpathway = "Lipid degradation: other") %>%
+  select(KO, Pathway, Subpathway)
+
+aa.deg.merge <- aa.deg %>%
+  mutate(Pathway = "Amino acid degradation") %>%
+  mutate(Subpathway = case_when(
+    grepl("arg", Subpathway) ~ "Amino acid degradation: Arginine/Proline",
+    grepl("methionine", Subpathway) ~ "Amino acid degradation: Cysteine/methionine",
+    grepl("lysine", Subpathway) ~ "Amino acid degradation: Lysine",
+    grepl("tyrosine", Subpathway) ~ "Amino acid degradation: Phenylalanine/tyrosine/tryptophan",
+    grepl("alanine", Subpathway) ~ "Amino acid degradation: Alanine/aspartate/asparagine/glutamate/glutamine",
+    grepl("serine", Subpathway) ~ "Amino acid degradation: Serine/glycine/threonine",
+    grepl("shared", Subpathway) ~ "Amino acid degradation: Shared"
+  )) %>%
+  select(KO, Pathway, Subpathway)
+
+degradation <- rbind(aro.deg.merge, nuc.deg.merge, ring.deg.merge, lipid.deg.merge, aa.deg.merge) %>%
+  mutate(Metabolism = "Degradation") %>%
+  select(KO, Metabolism, Pathway, Subpathway)
+
+#co2 pathways
+co2_reformat <- co2 %>%
+  mutate(Metabolism = "CO2 producing") %>%
+  rename(Pathway = Pathway_group) %>%
+  mutate(Subpathway = "NA") %>%
+  select(KO, Metabolism, Pathway, Subpathway)
+
+##All Paul's pathways
+all.pathways <- rbind(biosynthesis, energy, degradation, co2_reformat)
+
+
+  
+
+
+#merge VIP scores with KEGG classifications and components
+VIP.kegg <- VIP_all %>%
+  filter(KO %in% vip_kos) %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE) %>%
+  drop_na(coef) %>%
+  mutate(coefficient = as.numeric(coef)) %>%
+    distinct() %>%
+  arrange(desc(VIP_signed)) %>%
+  mutate(KO = fct_reorder(KO, VIP_signed)) %>%
+  merge(all.pathways, by = "KO", all.x = TRUE) %>%
+  select(KO, VIP, coefficient, VIP_signed, Metabolism, Pathway, Subpathway, Level1, Level2, Level3, Level4)
+
+VIP.kegg
+write.csv(VIP.kegg, "../output/PLSR/TableS1_10_v2.csv")
+```
+
+
+# Build per-category sums & panels
+```{r panels}
+# VIP ∩ curated KOs
+VIP_aa_bio    <- intersect(vip_kos, aa.biosynthesis$KO)
+VIP_lipid_bio <- intersect(vip_kos, lipid.biosynthesis$KO)
+VIP_nuc_bio   <- intersect(vip_kos, nuc.biosynthesis$KO)
+VIP_wall_bio  <- intersect(vip_kos, wall.biosynthesis$KO)
+VIP_teich_bio <- intersect(vip_kos, teich.biosynthesis$KO)
+VIP_eps_bio   <- intersect(vip_kos, eps.biosynthesis$KO)
+
+VIP_central <- intersect(vip_kos, central$KO)
+VIP_ferm    <- intersect(vip_kos, ferm$KO)
+VIP_pomp    <- intersect(vip_kos, pomp$KO)
+VIP_atp     <- intersect(vip_kos, atp$KO)
+VIP_pyrox   <- intersect(vip_kos, pyrox$KO)
+VIP_etc     <- intersect(vip_kos, etc$KO)
+VIP_co2 <- intersect(vip_kos, co2_reformat$KO)
+
+VIP_aa_deg <- intersect(vip_kos, aa.deg$KO)
+VIP_lipid_deg <- intersect(vip_kos, lipid.deg$KO)
+VIP_nuc_deg <- intersect(vip_kos, nuc.deg$KO)
+VIP_aro_deg <- intersect(vip_kos, aromatic.deg$KO)
+VIP_ring_deg <- intersect(vip_kos, ring.deg$KO)
+
+# Top row (biosynthesis)
+d_bio_aa    <- make_sum_table(cue.timepoint, vip_kos, VIP_aa_bio)
+d_bio_lipid <- make_sum_table(cue.timepoint, vip_kos, VIP_lipid_bio)
+d_bio_nuc   <- make_sum_table(cue.timepoint, vip_kos, VIP_nuc_bio)
+d_bio_wall  <- make_sum_table(cue.timepoint, vip_kos, VIP_wall_bio)
+d_bio_eps <- make_sum_table(cue.timepoint, vip_kos, VIP_eps_bio)
+d_bio_teich <- make_sum_table(cue.timepoint, vip_kos, VIP_teich_bio)
+
+
+p_bio_aa    <- add_r_p_annot(make_correlation_plots(d_bio_aa),    d_bio_aa)    + ggtitle("Amino acids")
+ggsave(paste(out_dir, "aa-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "aa-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+p_bio_aa_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_aa), d_bio_aa) + ggtitle("Amino acids")
+
+p_bio_lipid <- add_r_p_annot(make_correlation_plots(d_bio_lipid), d_bio_lipid) + ggtitle("Lipids")
+ggsave(paste(out_dir, "lipid-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "lipid-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+p_bio_lipid_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_lipid), d_bio_lipid) + ggtitle("Lipids")
+
+p_bio_nuc   <- add_r_p_annot(make_correlation_plots(d_bio_nuc),   d_bio_nuc)   + ggtitle("Nucleotides")
+ggsave(paste(out_dir, "nuc-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "nuc-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+p_bio_nuc_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_nuc), d_bio_nuc) + ggtitle("Nucleotides")
+
+p_bio_wall  <- add_r_p_annot(make_correlation_plots(d_bio_wall),  d_bio_wall)  + ggtitle("Peptidoglycan")
+ggsave(paste(out_dir, "wall-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "wall-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_eps  <- add_r_p_annot(make_correlation_plots(d_bio_eps),  d_bio_eps)  + ggtitle("EPS")
+ggsave(paste(out_dir, "eps-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "eps-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_bio_teich  <- add_r_p_annot(make_correlation_plots(d_bio_teich),  d_bio_teich)  + ggtitle("Teichoic acids")
+ggsave(paste(out_dir, "teich-biosynthesis-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "teich-biosynthesis-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+# Middle row (energy)
+d_eng_central <- make_sum_table(cue.timepoint, vip_kos, VIP_central)
+d_eng_ferm  <- make_sum_table(cue.timepoint, vip_kos, VIP_ferm)
+d_eng_pyrox <- make_sum_table(cue.timepoint, vip_kos, VIP_pyrox)
+d_eng_etc  <- make_sum_table(cue.timepoint, vip_kos, VIP_etc)
+d_eng_pomp  <- make_sum_table(cue.timepoint, vip_kos, VIP_pomp)
+d_eng_atp <- make_sum_table(cue.timepoint, vip_kos, VIP_atp)
+d_eng_co2 <- make_sum_table(cue.timepoint, vip_kos, VIP_co2)
+
+
+p_eng_central <- add_r_p_annot(make_correlation_plots(d_eng_central), d_eng_central) + ggtitle("Central C")
+ggsave(paste(out_dir, "central-energy-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "central-energy-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_eng_ferm <- add_r_p_annot(make_correlation_plots(d_eng_ferm),d_eng_ferm) + ggtitle("Fermentation")
+p_eng_pyrox <- add_r_p_annot(make_correlation_plots(d_eng_pyrox),d_eng_pyrox) + ggtitle("Pyr. oxidation")
+p_eng_etc <- add_r_p_annot(make_correlation_plots(d_eng_etc), d_eng_etc)  + ggtitle("ETC")
+#p_eng_pomp  <- add_r_p_annot(make_correlation_plots(d_eng_pomp), d_eng_pomp) + ggtitle("POMP")
+
+p_eng_atp <- add_r_p_annot(make_correlation_plots(d_eng_atp), d_eng_atp) + ggtitle("ATPase")
+ggsave(paste(out_dir, "atp-energy-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "atp-energy-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_eng_co2 <- add_r_p_annot(make_correlation_plots(d_eng_co2), d_eng_co2) + ggtitle("Pyr. Dehyd.")
+ggsave(paste(out_dir, "co2-energy-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir, "co2-energy-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+# Bottom row (summaries)
+all_bio_kos <- unique(c(VIP_aa_bio, VIP_lipid_bio, VIP_nuc_bio, VIP_wall_bio, VIP_teich_bio, VIP_eps_bio))
+all_eng_kos <- unique(c(VIP_central, VIP_pomp, VIP_ferm, VIP_atp, VIP_pyrox, VIP_etc))
+
+bio_all <- make_sum_table(cue.timepoint, vip_kos, all_bio_kos)
+eng_all <- make_sum_table(cue.timepoint, vip_kos, all_eng_kos)
+
+
+p_bio_all <- add_r_p_annot(make_correlation_plots(bio_all), bio_all) + ggtitle("All biosynthesis genes")
+p_eng_all <- add_r_p_annot(make_correlation_plots_with_legend(eng_all), eng_all) + ggtitle("All energy genes")
+
+# Ratio biosynthesis:energy
+ratio_df <- bio_all %>%
+  rename(bio_sum = sum.vst) %>%
+  inner_join(eng_all %>% rename(eng_sum = sum.vst), by = c("SampleID", "Timepoint", "Moisture", "CUE.metric.log")) %>%
+  mutate(sum.vst = bio_sum / pmax(eng_sum, 1e-6))
+
+p_ratio <- add_r_p_annot(make_correlation_plots(ratio_df), ratio_df) +
+  ylab("CGE metric (log)") + xlab("biosynthesis : energy ratio") + ggtitle("Biosynthesis : Energy")
+
+# Ratio biosynthesis:co2-energy
+ratio_df_co2 <- bio_all %>%
+  rename(bio_sum = sum.vst) %>%
+  inner_join(d_eng_co2 %>% rename(co2_sum = sum.vst), by = c("SampleID", "Timepoint", "Moisture", "CUE.metric.log")) %>%
+  mutate(sum.vst = bio_sum / pmax(co2_sum, 1e-6))
+
+p_ratio_co2 <- add_r_p_annot(make_correlation_plots(ratio_df_co2), ratio_df_co2) +
+  ylab("CGE metric (log)") + xlab("biosynthesis : energy ratio") + ggtitle("Biosynthesis : Energy (CO2)")
+
+# Degradation
+d_deg_aa <- make_sum_table(cue.timepoint, vip_kos, VIP_aa_deg)
+d_deg_lipid <- make_sum_table(cue.timepoint, vip_kos, VIP_lipid_deg)
+d_deg_nuc <- make_sum_table(cue.timepoint, vip_kos, VIP_nuc_deg)
+d_deg_aro <- make_sum_table(cue.timepoint, vip_kos, VIP_aro_deg)
+d_deg_ring <- make_sum_table(cue.timepoint, vip_kos, VIP_ring_deg)
+
+p_deg_aa <- add_r_p_annot(make_correlation_plots(d_deg_aa), d_deg_aa) + ggtitle("Amino acids")
+ggsave(paste(out_dir_deg, "degradation-amino-acid-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir_deg, "degradation-amino-acid-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_deg_lipid <- add_r_p_annot(make_correlation_plots(d_deg_lipid), d_deg_lipid) + ggtitle("Lipids")
+ggsave(paste(out_dir_deg, "degradation-lipid-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir_deg, "degradation-lipid-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_deg_nuc <- add_r_p_annot(make_correlation_plots(d_deg_nuc), d_deg_nuc) + ggtitle("Nucleotides")
+ggsave(paste(out_dir_deg, "degradation-nuc-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir_deg, "degradation-nuc-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+
+p_deg_aro <- add_r_p_annot(make_correlation_plots(d_deg_aro), d_deg_aro) + ggtitle("Aromatics")
+ggsave(paste(out_dir_deg, "degradation-aro-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir_deg, "degradation-aro-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+p_deg_ring <- add_r_p_annot(make_correlation_plots_with_legend(d_deg_ring), d_deg_ring) + ggtitle("Aromatic rings")
+ggsave(paste(out_dir_deg, "degradation-ring-genes.png") , dpi = r, height = h, width = w, units = "in")
+ggsave(paste(out_dir_deg, "degradation-ring-genes.pdf") , dpi = r, height = h, width = w, units = "in")
+
+all_deg_kos <- unique(c(VIP_aa_deg, VIP_lipid_deg, VIP_nuc_deg, VIP_aro_deg, VIP_ring_deg))
+
+deg_all <- make_sum_table(cue.timepoint, vip_kos, all_deg_kos)
+
+p_deg_all <- add_r_p_annot(make_correlation_plots(deg_all), deg_all) + ggtitle("All degradation genes")
+
+```
+
+```{r}
+# Usage example with actual object names from earlier:
+ p_list <- list(
+   make_correlation_plots(d_bio_aa) + ggtitle("AA"),
+   make_correlation_plots(d_bio_lipid) + ggtitle("Lipid"),
+   make_correlation_plots(d_bio_nuc) + ggtitle("Nucleotide"),
+   make_correlation_plots(d_bio_wall) + ggtitle("Peptidoglycan"),
+   make_correlation_plots(d_bio_teich) + ggtitle("Teichoic acid"),
+   make_correlation_plots(d_bio_eps) + ggtitle("EPS"),
+   make_correlation_plots(d_eng_central) + ggtitle("Central C"),
+   make_correlation_plots(d_eng_ferm) + ggtitle("Fermentation"),
+   make_correlation_plots(d_eng_pyrox) + ggtitle("Pyr. oxidation"),
+   make_correlation_plots(d_eng_etc) + ggtitle("ETC"),
+   make_correlation_plots(d_eng_atp) + ggtitle("ATPase"),
+   make_correlation_plots(d_eng_co2) + ggtitle("Pyr. dehyd."),
+   make_correlation_plots(bio_all) + ggtitle("All biosynthesis"),
+   make_correlation_plots(eng_all) + ggtitle("All energy"),
+   make_correlation_plots(ratio_df, x_label ="ratio") + ggtitle("Biosyn:Energy ratio"),
+   make_correlation_plots(ratio_df_co2, x_label="ratio") + ggtitle("Biosyn:Energy (CO2) ratio")
+ )
+#
+data_list <- list(
+  d_bio_aa,
+  d_bio_lipid,
+  d_bio_nuc,
+  d_bio_wall,
+  d_bio_teich,
+  d_bio_eps,
+  d_eng_central,
+  d_eng_ferm,
+  d_eng_pyrox,
+  d_eng_etc,
+  d_eng_atp,
+  d_eng_co2,
+  bio_all,
+  eng_all,
+  ratio_df,
+  ratio_df_co2
+)
+#
+annotated <- annotate_panels_with_fdr(p_list, data_list)
+
+top_row    <- wrap_plots(annotated[1:6],  nrow = 1)
+middle_row <- wrap_plots(annotated[7:12], nrow = 1)
+bottom_row <- wrap_plots(annotated[13:16], nrow = 1)
+
+final_plot <- (top_row / middle_row / bottom_row) + 
+              plot_layout(guides = 'collect') & 
+              theme(legend.position = 'bottom')
+
+# Assemble and save multi-panel figure (4) (a–k)
+```
+
+```{r grid}
+# combined <- (
+#   (p_bio_aa | p_bio_lipid | p_bio_nuc | p_bio_wall | p_bio_eps | p_bio_teich) /
+#   (p_eng_central | p_eng_ferm | p_eng_pyrox | p_eng_etc | p_eng_atp) /
+#   (p_bio_all | p_eng_all | p_ratio)
+# ) + plot_annotation(tag_levels = 'a')
+# 
+# combined
+
+row1 <- (p_bio_aa + theme(axis.title.x = element_blank()) |
+         p_bio_lipid + theme(axis.title.x = element_blank()) |
+         p_bio_nuc + theme(axis.title.x = element_blank()) |
+         p_bio_wall + theme(axis.title.x = element_blank()) |
+         p_bio_teich + theme(axis.title.x = element_blank()) |
+         p_bio_eps + theme(axis.title.x = element_blank()))
+
+row2 <- (p_eng_central + theme(axis.title.x = element_blank()) |
+         p_eng_ferm + theme(axis.title.x = element_blank()) |
+         p_eng_pyrox + theme(axis.title.x = element_blank()) |
+         p_eng_etc + theme(axis.title.x = element_blank()) |
+         p_eng_atp + theme(axis.title.x = element_blank()))
+
+
+# bottom row keeps x-axis labels
+row3 <- (p_bio_all | p_eng_all | p_ratio)
+
+combined <- (row1 / row2 / row3) + plot_annotation(tag_levels = 'a')
+
+# combined <- (
+#   (p_bio_aa | p_bio_lipid | p_bio_nuc | p_bio_wall | p_bio_eps | p_bio_teich) /
+#   (p_eng_central | p_eng_ferm | p_eng_pyrox | p_eng_etc | p_eng_atp) /
+#   (p_bio_all | p_eng_all | p_ratio)
+# ) + plot_annotation(tag_levels = 'a')
+# 
+
+
+# combined with co2 genes
+
+row1 <- (p_bio_aa + theme(axis.title.x = element_blank()) |
+         p_bio_lipid + theme(axis.title.x = element_blank()) |
+         p_bio_nuc + theme(axis.title.x = element_blank()) |
+         p_bio_wall + theme(axis.title.x = element_blank()) |
+         p_bio_teich + theme(axis.title.x = element_blank()) |
+         p_bio_eps + theme(axis.title.x = element_blank()))
+
+row2 <- (p_eng_central + theme(axis.title.x = element_blank()) |
+         p_eng_ferm + theme(axis.title.x = element_blank()) |
+         p_eng_pyrox + theme(axis.title.x = element_blank()) |
+         p_eng_etc + theme(axis.title.x = element_blank()) |
+         p_eng_atp + theme(axis.title.x = element_blank()) |
+         p_eng_co2 + theme(axis.title.x = element_blank()))
+
+
+# bottom row keeps x-axis labels
+row3 <- (p_bio_all | p_eng_all | p_ratio | p_ratio_co2)
+
+combined.co2 <- (row1 / row2 / row3) + plot_annotation(tag_levels = 'a')
+
+```
+
+
+
+# Assemble and save multi-panel figure (S4) (a–f)
+
+```{r grid}
+# combined <- (
+#   (p_bio_aa | p_bio_lipid | p_bio_nuc | p_bio_wall | p_bio_eps | p_bio_teich) /
+#   (p_eng_central | p_eng_ferm | p_eng_pyrox | p_eng_etc | p_eng_atp) /
+#   (p_bio_all | p_eng_all | p_ratio)
+# ) + plot_annotation(tag_levels = 'a')
+# 
+# combined
+
+row1 <- (p_deg_aa + theme(axis.title.x = element_blank()) |
+         p_deg_lipid + theme(axis.title.x = element_blank()) |
+         p_deg_nuc + theme(axis.title.x = element_blank()) )
+         
+row2 <- (p_deg_aro |p_deg_ring |p_deg_all)
+
+
+combined_deg <- (row1 / row2) + plot_annotation(tag_levels = 'a')
+
+
+```
+
+```{r save}
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_10.png"), plot = combined, width = 13, height = 9, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_10.pdf"), plot = combined, width = 13, height = 9, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_co2_10.png"), plot = final_plot, width = 13, height = 9, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_co2_10.pdf"), plot = combined.co2, width = 13, height = 9, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir_deg, "CGE_vs_expression_grid_deg_10.png"), plot = combined_deg, width = 8, height = 6, units = "in", dpi = 300)
+ggsave(file.path(out_dir_deg, "CGE_vs_expression_grid_deg_10.pdf"), plot = combined_deg, width = 8, height = 6, units = "in", dpi = 300)
+
+
+```
+
+# Build per-subpathway sums & panels
+```{r panels}
+#load table S1
+VIP.kegg <- read.csv("../output/PLSR/TableS1_10.csv", header = TRUE)
+
+####Amino acid biosynthesis subpathways
+aa.bio <- VIP.kegg %>%
+  filter(Pathway == "Amino acid biosynthesis")
+
+#Cystene
+VIP.cysteine.bio <- aa.bio %>%
+  filter(grepl("Cysteine", Subpathway))
+
+d_bio_cysteine    <- make_sum_table_no_intersect(cue.timepoint, VIP.cysteine.bio$KO)
+p_bio_cysteine <- add_r_p_annot(make_correlation_plots(d_bio_cysteine), d_bio_cysteine) + ggtitle("Cysteine")
+
+#Serine
+VIP.serine.bio <- aa.bio %>%
+  filter(grepl("Serine", Subpathway))
+
+d_bio_serine    <- make_sum_table_no_intersect(cue.timepoint, VIP.serine.bio$KO)
+p_bio_serine <- add_r_p_annot(make_correlation_plots(d_bio_serine), d_bio_serine) + ggtitle("Serine")
+
+#Lysine/methionine
+VIP.lysmeth.bio <- aa.bio %>%
+  filter(grepl("Lysine", Subpathway))
+
+d_bio_lysmeth    <- make_sum_table_no_intersect(cue.timepoint, VIP.lysmeth.bio$KO)
+p_bio_lysmeth <- add_r_p_annot(make_correlation_plots(d_bio_lysmeth), d_bio_lysmeth) + ggtitle("Lysine/methionine")
+
+#Alanine
+VIP.alanine.bio <- aa.bio %>%
+  filter(grepl("Alanine", Subpathway))
+
+d_bio_alanine    <- make_sum_table_no_intersect(cue.timepoint, VIP.alanine.bio$KO)
+p_bio_alanine <- add_r_p_annot(make_correlation_plots(d_bio_alanine), d_bio_alanine) + ggtitle("Alanine")
+
+#Tryptophan
+VIP.trypt.bio <- aa.bio %>%
+  filter(grepl("Tryptophan", Subpathway))
+
+d_bio_trypt    <- make_sum_table_no_intersect(cue.timepoint, VIP.trypt.bio$KO)
+p_bio_trypt <- add_r_p_annot(make_correlation_plots(d_bio_trypt), d_bio_trypt) + ggtitle("Tryptophan")
+
+#Chorismate
+VIP.chor.bio <- aa.bio %>%
+  filter(grepl("Chorismate", Subpathway))
+
+d_bio_chor    <- make_sum_table_no_intersect(cue.timepoint, VIP.chor.bio$KO)
+p_bio_chor <- add_r_p_annot(make_correlation_plots(d_bio_chor), d_bio_chor) + ggtitle("Chorismate")
+
+#Shared
+VIP.shared.bio <- aa.bio %>%
+  filter(grepl("shared", Subpathway))
+
+d_bio_shared    <- make_sum_table_no_intersect(cue.timepoint, VIP.shared.bio$KO)
+p_bio_shared <- add_r_p_annot(make_correlation_plots(d_bio_shared), d_bio_shared) + ggtitle("Shared")
+
+
+####Nucleotide biosynthesis subpathway 
+nuc.bio <- VIP.kegg %>%
+  filter(Pathway == "Nucleotide biosynthesis")
+
+#Ribonucleotide
+VIP.ribonuc.bio <- nuc.bio %>%
+  filter(grepl("ribonucleotide", Subpathway))
+
+d_bio_ribonuc    <- make_sum_table_no_intersect(cue.timepoint, VIP.ribonuc.bio$KO)
+p_bio_ribonuc <- add_r_p_annot(make_correlation_plots(d_bio_ribonuc), d_bio_ribonuc) + ggtitle("Ribonucleotide")
+p_bio_ribonuc_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_ribonuc), d_bio_ribonuc) + ggtitle("Ribonucleotide")
+
+#Purine
+VIP.purine.bio <- nuc.bio %>%
+  filter(grepl("purine", Subpathway))
+
+d_bio_purine    <- make_sum_table_no_intersect(cue.timepoint, VIP.purine.bio$KO)
+p_bio_purine <- add_r_p_annot(make_correlation_plots(d_bio_purine), d_bio_purine) + ggtitle("Purine")
+p_bio_purine_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_purine), d_bio_purine) + ggtitle("Purine")
+
+#Purine/pyrimidine
+VIP.purinepyr.bio <- nuc.bio %>%
+  filter(grepl("purine", Subpathway) |
+           grepl("pyrimidine", Subpathway))
+
+d_bio_purinepyr    <- make_sum_table_no_intersect(cue.timepoint, VIP.purinepyr.bio$KO)
+p_bio_purinepyr <- add_r_p_annot(make_correlation_plots(d_bio_purinepyr), d_bio_purinepyr) + ggtitle("Purine/pyrimidine")
+p_bio_purinepyr_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_purinepyr), d_bio_purinepyr) + ggtitle("Purine/pyrimidine")
+
+#Pyrimidine
+VIP.pyr.bio <- nuc.bio %>%
+  filter(grepl("pyrimidine", Subpathway))
+
+d_bio_pyr    <- make_sum_table_no_intersect(cue.timepoint, VIP.pyr.bio$KO)
+p_bio_pyr <- add_r_p_annot(make_correlation_plots(d_bio_pyr), d_bio_pyr) + ggtitle("Pyrimidine")
+p_bio_pyr_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_bio_pyr), d_bio_pyr) + ggtitle("Pyrimidine")
+
+#### Lipid biosynthesis subpathway 
+lipid.bio <- VIP.kegg %>%
+  filter(Pathway == "Lipid biosynthesis")
+
+#Fatty acid
+VIP.fa.bio <- lipid.bio %>%
+  filter(grepl("Fatty", Subpathway))
+
+d_bio_fa    <- make_sum_table_no_intersect(cue.timepoint, VIP.fa.bio$KO)
+p_bio_fa <- add_r_p_annot(make_correlation_plots(d_bio_fa), d_bio_fa) + ggtitle("Fatty acid")
+
+#Glycerolipid
+VIP.glyc.bio <- lipid.bio %>%
+  filter(grepl("Glycerolipid", Subpathway))
+
+d_bio_glyc   <- make_sum_table_no_intersect(cue.timepoint, VIP.glyc.bio$KO)
+p_bio_glyc <- add_r_p_annot(make_correlation_plots(d_bio_glyc), d_bio_glyc) + ggtitle("Glycerolipid")
+
+#Glycerophospholipid
+VIP.glycp.bio <- lipid.bio %>%
+  filter(grepl("Glycerophospholipid", Subpathway))
+
+d_bio_glycp   <- make_sum_table_no_intersect(cue.timepoint, VIP.glycp.bio$KO)
+p_bio_glycp <- add_r_p_annot(make_correlation_plots(d_bio_glycp), d_bio_glycp) + ggtitle("Glycerophospholipid")
+
+#### Peptidoglycan biosynthesis subpathway 
+wall.bio <- VIP.kegg %>%
+  filter(Pathway == "Peptidoglycan biosynthesis")
+
+#Unit
+VIP.unit.bio <- wall.bio %>%
+  filter(grepl("unit", Subpathway))
+
+d_bio_unit    <- make_sum_table_no_intersect(cue.timepoint, VIP.unit.bio$KO)
+p_bio_unit <- add_r_p_annot(make_correlation_plots(d_bio_unit), d_bio_unit) + ggtitle("Peptidoglycan unit")
+
+#amino sugar
+VIP.amino.bio <- wall.bio %>%
+  filter(grepl("Aminosugar", Subpathway))
+
+d_bio_amino    <- make_sum_table_no_intersect(cue.timepoint, VIP.amino.bio$KO)
+p_bio_amino <- add_r_p_annot(make_correlation_plots(d_bio_amino), d_bio_amino) + ggtitle("Aminosugar")
+
+#### eps biosynthesis subpathway 
+eps.bio <- VIP.kegg %>%
+  filter(Pathway == "EPS biosynthesis")
+
+#alginate
+VIP.alg.bio <- eps.bio %>%
+  filter(grepl("Alginate", Subpathway))
+
+d_bio_alg    <- make_sum_table_no_intersect(cue.timepoint, VIP.alg.bio$KO)
+p_bio_alg <- add_r_p_annot(make_correlation_plots(d_bio_alg), d_bio_alg) + ggtitle("Alginate")
+
+#acetan
+VIP.acetan.bio <- eps.bio %>%
+  filter(grepl("Acetan", Subpathway))
+
+d_bio_acetan    <- make_sum_table_no_intersect(cue.timepoint, VIP.acetan.bio$KO)
+p_bio_acetan <- add_r_p_annot(make_correlation_plots(d_bio_acetan), d_bio_acetan) + ggtitle("Acetan/xanthan")
+
+###ATPase subpathway
+atp.en <- VIP.kegg %>%
+  filter(Pathway == "ATPase")
+
+#F-type
+VIP.f.en <- atp.en %>%
+  filter(grepl("F-type", Subpathway))
+
+d_en_f    <- make_sum_table_no_intersect(cue.timepoint, VIP.f.en$KO)
+p_en_f <- add_r_p_annot(make_correlation_plots_with_legend(d_en_f), d_en_f) + ggtitle("F-type")
+
+#P-type
+VIP.p.en <- atp.en %>%
+  filter(grepl("P-type", Subpathway))
+
+d_en_p    <- make_sum_table_no_intersect(cue.timepoint, VIP.p.en$KO)
+p_en_p <- add_r_p_annot(make_correlation_plots_with_legend(d_en_p), d_en_p) + ggtitle("P-type")
+
+#ATP-binding
+VIP.atpb.en <- atp.en %>%
+  filter(grepl("ATP-binding", Subpathway))
+
+d_en_atpb    <- make_sum_table_no_intersect(cue.timepoint, VIP.atpb.en$KO)
+p_en_atpb <- add_r_p_annot(make_correlation_plots_with_legend(d_en_atpb), d_en_atpb) + ggtitle("ATP-binding")
+
+####Amino acid degradationsubpathway 
+aa.deg <- VIP.kegg %>%
+  filter(Pathway == "Amino acid degradation")
+
+#Arginine/proline
+VIP.arginine.deg <- aa.deg %>%
+  filter(grepl("Arginine", Subpathway))
+
+d_deg_arginine    <- make_sum_table_no_intersect(cue.timepoint, VIP.arginine.deg$KO)
+p_deg_arginine <- add_r_p_annot(make_correlation_plots_with_legend(d_deg_arginine), d_deg_arginine) + ggtitle("Arginine/proline")
+
+
+#Phenylalanine/tyrosine/tryptophan
+VIP.phenyl.deg <- aa.deg %>%
+  filter(grepl("Phenylalanine", Subpathway))
+
+d_deg_phenyl    <- make_sum_table_no_intersect(cue.timepoint, VIP.phenyl.deg$KO)
+p_deg_phenyl <- add_r_p_annot(make_correlation_plots(d_deg_phenyl), d_deg_phenyl) + ggtitle("Phenylalanine/tyrosine/tryptophan")
+
+#Cysteine/methionine
+VIP.cysteine.deg <- aa.deg %>%
+  filter(grepl("Cysteine", Subpathway))
+
+d_deg_cysteine    <- make_sum_table_no_intersect(cue.timepoint, VIP.cysteine.deg$KO)
+p_deg_cysteine <- add_r_p_annot(make_correlation_plots(d_deg_cysteine), d_deg_cysteine) + ggtitle("Cysteine/methionine")
+
+
+#Alanine/aspartate/asparagine/glutamate/glutamine
+VIP.alanine.deg <- aa.deg %>%
+  filter(grepl("Alanine", Subpathway))
+
+d_deg_alanine    <- make_sum_table_no_intersect(cue.timepoint, VIP.alanine.deg$KO)
+p_deg_alanine <- add_r_p_annot(make_correlation_plots(d_deg_alanine), d_deg_alanine) + 
+  ggtitle("Alanine/aspartate/asparagine \n/glutamate/glutamine")
+
+#Lysine
+VIP.lysine.deg <- aa.deg %>%
+  filter(grepl("Lysine", Subpathway))
+
+d_deg_lysine    <- make_sum_table_no_intersect(cue.timepoint, VIP.lysine.deg$KO)
+p_deg_lysine <- add_r_p_annot(make_correlation_plots(d_deg_lysine), d_deg_lysine) + ggtitle("Lysine")
+
+#shared
+VIP.shared.deg <- aa.deg %>%
+  filter(grepl("Shared", Subpathway))
+
+d_deg_shared    <- make_sum_table_no_intersect(cue.timepoint, VIP.shared.deg$KO)
+p_deg_shared <- add_r_p_annot(make_correlation_plots(d_deg_shared), d_deg_shared) + ggtitle("Shared")
+
+####Nucleotide degradation subpathway 
+nuc.deg <- VIP.kegg %>%
+  filter(Pathway == "Nucleotide degradation")
+
+#Purine
+VIP.purine.deg <- nuc.deg %>%
+  filter(grepl("purine", Subpathway))
+
+d_deg_purine    <- make_sum_table_no_intersect(cue.timepoint, VIP.purine.deg$KO)
+p_deg_purine <- add_r_p_annot(make_correlation_plots(d_deg_purine), d_deg_purine) + ggtitle("Purine")
+p_deg_purine_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_deg_purine, show_legend = FALSE), d_deg_purine) + ggtitle("Purine")
+
+#Pyrimidine
+VIP.pyr.deg <- nuc.deg %>%
+  filter(grepl("pyrimidine", Subpathway))
+
+d_deg_pyr    <- make_sum_table_no_intersect(cue.timepoint, VIP.pyr.deg$KO)
+p_deg_pyr <- add_r_p_annot(make_correlation_plots_with_legend(d_deg_pyr), d_deg_pyr) + ggtitle("Pyrimidine")
+p_deg_pyr_2 <- add_r_p_annot_by_moisture(make_correlation_plots_by_moisture(d_deg_pyr, show_legend = TRUE), d_deg_pyr) + ggtitle("Pyrimidine")
+
+
+
+####Aromatic degradation subpathway 
+aro.deg <- VIP.kegg %>%
+  filter(Pathway == "Xenobiotics degradation")
+
+#Benzoate
+VIP.benz.deg <- aro.deg %>%
+  filter(grepl("Benzoate", Subpathway))
+
+d_deg_benz    <- make_sum_table_no_intersect(cue.timepoint, VIP.benz.deg$KO)
+p_deg_benz <- add_r_p_annot(make_correlation_plots(d_deg_benz), d_deg_benz) + ggtitle("Benzoate")
+
+#Furfural
+VIP.furf.deg <- aro.deg %>%
+  filter(grepl("Furfural", Subpathway))
+
+d_deg_furf    <- make_sum_table_no_intersect(cue.timepoint, VIP.furf.deg$KO)
+p_deg_furf <- add_r_p_annot(make_correlation_plots(d_deg_furf), d_deg_furf) + ggtitle("Furfural")
+
+
+#Aminobenzoate
+VIP.ambenz.deg <- aro.deg %>%
+  filter(grepl("Aminobenzoate", Subpathway))
+
+d_deg_ambenz    <- make_sum_table_no_intersect(cue.timepoint, VIP.ambenz.deg$KO)
+p_deg_ambenz <- add_r_p_annot(make_correlation_plots(d_deg_ambenz), d_deg_ambenz) + ggtitle("Aminobenzoate")
+
+
+#Atrazine
+VIP.atrazine.deg <- aro.deg %>%
+  filter(grepl("Atrazine", Subpathway))
+
+d_deg_atrazine    <- make_sum_table_no_intersect(cue.timepoint, VIP.atrazine.deg$KO)
+p_deg_atrazine <- add_r_p_annot(make_correlation_plots(d_deg_atrazine), d_deg_atrazine) + ggtitle("Atrazine")
+
+#Steroid
+VIP.steroid.deg <- aro.deg %>%
+  filter(grepl("Steroid", Subpathway))
+
+d_deg_steroid    <- make_sum_table_no_intersect(cue.timepoint, VIP.steroid.deg$KO)
+p_deg_steroid <- add_r_p_annot(make_correlation_plots(d_deg_steroid), d_deg_steroid) + ggtitle("Steroid")
+
+#Naphthalene
+VIP.napth.deg <- aro.deg %>%
+  filter(grepl("Naphthalene", Subpathway))
+
+d_deg_napth    <- make_sum_table_no_intersect(cue.timepoint, VIP.napth.deg$KO)
+p_deg_napth <- add_r_p_annot(make_correlation_plots(d_deg_napth), d_deg_napth) + ggtitle("Naphthalene")
+
+#Caprolactam
+VIP.capro.deg <- aro.deg %>%
+  filter(grepl("Caprolactam", Subpathway))
+
+d_deg_capro    <- make_sum_table_no_intersect(cue.timepoint, VIP.capro.deg$KO)
+p_deg_capro <- add_r_p_annot(make_correlation_plots(d_deg_capro), d_deg_capro) + ggtitle("Caprolactam")
+
+#Chlorocyclohexane
+VIP.chloro.deg <- aro.deg %>%
+  filter(grepl("Chlorocyclohexane", Subpathway))
+
+d_deg_chloro    <- make_sum_table_no_intersect(cue.timepoint, VIP.chloro.deg$KO)
+p_deg_chloro <- add_r_p_annot(make_correlation_plots(d_deg_chloro), d_deg_chloro) + ggtitle("Chlorocyclohexane and chlorobenzene")
+
+```
+
+
+```{r}
+#aa biosynthesis and depgradation
+row1 <- (p_bio_cysteine + theme(axis.title.x = element_blank()) |
+         p_bio_serine + theme(axis.title.x = element_blank()) |
+         p_bio_lysmeth + theme(axis.title.x = element_blank()) |
+           p_bio_shared)
+         
+row2 <- (p_bio_trypt + theme(axis.title.x = element_blank()) |
+           p_bio_chor + theme(axis.title.x = element_blank())|
+           p_bio_alanine + theme(axis.title.x = element_blank()))
+
+row3 <- (p_deg_alanine + theme(axis.title.x = element_blank()) |
+         p_deg_cysteine + theme(axis.title.x = element_blank()) |
+         p_deg_lysine + theme(axis.title.x = element_blank())) 
+
+row4 <- (p_deg_phenyl| p_deg_arginine | p_deg_shared )
+
+
+combined_aa_bio_deg <- (row1 / row2 / row3 / row4) + plot_annotation(tag_levels = 'a')
+
+
+#nucleotide biosynthesis
+row1 <- (p_bio_purine + theme(axis.title.x = element_blank()) |
+           p_bio_pyr + theme(axis.title.x = element_blank()) |
+           p_bio_ribonuc + theme(axis.title.x = element_blank()))
+row2 <- (p_deg_purine + theme(axis.title.x = element_blank()) |
+           p_deg_pyr + theme(axis.title.x = element_blank()))
+         
+combined_nuc_bio_deg <- (row1 / row2) + plot_annotation(tag_levels = 'a')
+
+#nucleotide biosynthesis with two regressions
+row1 <- (p_bio_purine_2 + theme(axis.title.x = element_blank()) |
+           p_bio_pyr_2 + theme(axis.title.x = element_blank()) |
+           p_bio_ribonuc_2 + theme(axis.title.x = element_blank()))
+row2 <- (p_deg_purine_2 + theme(axis.title.x = element_blank()) |
+           p_deg_pyr_2 + theme(axis.title.x = element_blank()))
+         
+combined_nuc_bio_deg_2 <- (row1 / row2) + plot_annotation(tag_levels = 'a')
+
+#lipid biosynthesis
+combined_lipid_bio <- (p_bio_fa | p_bio_glyc | p_bio_glycp) + plot_annotation(tag_levels = 'a')
+
+#peptidoglycan biosynthesis
+combined_wall_bio <- (p_bio_unit | p_bio_amino) + plot_annotation(tag_levels = 'a') 
+
+#eps
+combined_eps_bio <- (p_bio_alg | p_bio_acetan) + plot_annotation(tag_levels = 'a') 
+
+#aromatic degradation
+row1 <- 
+
+```
+
+```{r save combined figures}
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_amino_acid_10.png"), plot = combined_aa_bio_deg, width = 13, height = 11, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_amino_acid_10.pdf"), plot = combined_aa_bio_deg, width = 13, height = 11, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_nucleotide_10.png"), plot = combined_nuc_bio_deg, width = 8, height = 8, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_nucleotide_10.pdf"), plot = combined_nuc_bio_deg, width = 8, height = 8, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_nucleotide2_10.png"), plot = combined_nuc_bio_deg_2, width = 8, height = 8, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_nucleotide2_10.pdf"), plot = combined_nuc_bio_deg_2, width = 8, height = 8, units = "in", dpi = 300)
+```
+

@@ -1,0 +1,387 @@
+---
+title: "metaT"
+author: "Linnea Honeker"
+date: "11/26/2022; revised 4/22/24 for 4th wedge data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(DESeq2)
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(rlang)
+library("pheatmap")
+library(parallel)
+library(cowplot)
+library(KEGGREST)
+library(gplots)
+
+
+
+#source("../../qSIP_scripts/metaT-mapped-to-gene-catalog/functions.R")
+
+```
+
+## i transferred the merged file from the hpc (gene_expression_count_koala_post_dram_hpc.R) to complete analysis in R.
+
+#load merged, create count summary, filter, and merge with KEGG brite levels
+```{r merge cleaned final gene tables from hpc}
+
+merged <- read.csv("../../qSIP-old-pipeline/qSIP_data/metaT-mapped-to-gene-catalog-post-dram/count/Merged-count-all-genes.csv", 
+                   header = TRUE) #located on figshare
+
+ann.ko.f <- read.csv("../../qsIP-old-pipeline/qSIP_data/metaT-mapped-to-gene-catalog-post-dram/annotations-ko-f.csv",
+                     header = TRUE) #located on figshare
+
+#create counts that mapped to gene catalog summary post filtering for paper
+#first, separate out the Contig column to isolate the short unique contig name
+merged.counts.summary.0 <- merged %>%
+  select(-X) %>%
+  separate(Contig, c("Contig", "ann"), sep = ";") %>%
+  separate(Contig, c("Contig", "rank", "letter"), sep = " ") %>%
+  select(-c(rank, letter, ann)) 
+
+merged.counts.summary.1 <- merged.counts.summary.0 %>%
+  mutate(Contig = str_replace(Contig, "min1000_", "min1000;")) %>%
+  separate(Contig, c("Part1", "Part2"), sep = ";")
+
+merged.counts.summary.2 <- merged.counts.summary.1 %>%
+  select(-Part1) %>%
+  mutate(row_id = row_number()) %>%
+  unite(Contig, c("Part2", "row_id"), sep = "_") %>%
+  column_to_rownames(var = "Contig") 
+
+#transpose to add up counts across samples
+merged.counts.summary.3 <- merged.counts.summary.2 %>%
+   mutate(across(everything(), ~replace_na(.x, 0))) %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(sum.count = rowSums(.)) 
+
+#create a dataframe with just sample and sum of counts
+counts.summary <- merged.counts.summary.3 %>%
+  select(sum.count)
+
+#save
+write.csv(counts.summary, "../output/metaT/summary_counts_per_sample_mapped.csv")
+read.csv("../output/metaT/summary_counts_per_sample_mapped.csv", header = TRUE)
+
+
+range(counts.summary)
+  
+
+#merge merged file with annotation
+merged.final <- merged %>% 
+  separate(Contig, c("Contig", "ann"), sep = ";") %>%
+  separate(Contig, c("Contig", "rank", "letter"), sep = " ") %>%
+  select(-c(rank, letter, ann)) %>%
+  replace(is.na(.), 0) %>%
+  merge(ann.ko.f, by = "Contig", all = FALSE)
+
+#group by KO and sum counts 
+merged.final.grouped <- merged.final %>% 
+  select(-Contig) %>%
+  select(-X.1, -X.y, -X.x, -P08_x100_t3) %>%
+  group_by(ko_id) %>%
+  summarise_all(sum) 
+
+#filter final merged file to leave only genes in at least about 20% of samples
+limit = round(ncol(merged.final.grouped)*0.2)
+merged.final.grouped.f <- merged.final.grouped %>%
+  column_to_rownames(var = "ko_id") %>%
+  mutate(sum.count = rowSums(.)) %>%
+  mutate(gr.zero = rowSums(. > 0)) %>%
+  filter(gr.zero > limit) %>%
+  mutate(sum.count.per = sum.count/sum(sum.count)) %>%
+  filter(sum.count.per > 0.00000001) %>%
+  select(-c(gr.zero, sum.count.per, sum.count)) %>%
+  rownames_to_column(var = "ko_id")
+
+
+#change sample id for subject P4 to P04
+colnames(merged.final) <- str_replace(colnames(merged.final), "P4", "P04")
+colnames(merged.final.grouped.f) <- str_replace(colnames(merged.final.grouped.f), "P4", "P04")
+colnames(merged.final.grouped) <- str_replace(colnames(merged.final.grouped), "P4", "P04")
+
+#save count tables
+write.csv(merged.final, "../output/metaT/final_count_all_contigs_KO.csv") #count table of all contigs with KO column
+write.csv(merged.final.grouped, "../output/metaT/final_count_KO.csv") #count table grouped and summarized (sum) by KO
+write.csv(merged.final.grouped.f, "../output/metaT/final_count_KO_f.csv") #count table filtered to more abundance KOs 
+                                                                            #across at least 25% of samples
+
+
+```
+
+
+Load Kegg brite levels and merge with count table
+```{r kegg brite heiarchy}
+#load merged count table
+merged.final.grouped.f <- read.csv("../output/metaT/final_count_KO_f.csv", header = TRUE)
+
+#load brite heiarchy table
+kegg.brite <- read.csv("../output/KEGG/Kegg_brite_all.csv") %>% select(-X)
+
+#merge brite heiarchy table with count table
+merged.final.f.brite <- merged.final.grouped.f %>%
+  merge(kegg.brite, by.x = "ko_id", by.y = "KO", all.x = TRUE, all.y = FALSE)
+
+#save merged brite heiarchy with count table
+write.csv(merged.final.f.brite, "../output/metaT/final_count_KO_f_brite.csv")
+```
+
+Prepare dataframe and metadata for DeSeq2
+```{r}
+#import count data, transform to matrix, import column metadata, check that its a data.frame
+
+cts.0 <- read.csv("../output/metaT/final_count_KO_f.csv", header = TRUE) %>% select(-X) 
+
+#extract metadata from sampleID in counts (cts.) data frame
+coldata.0 <- cts.0 %>%
+  column_to_rownames(var = "ko_id") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "SampleID") %>%
+  select(SampleID) %>%
+  separate(SampleID, c("Plot", "Moisture", "Timepoint"), sep = "_", remove = FALSE) %>%
+  mutate(CGE = case_when(
+    Timepoint == "t24" ~ "High",
+    Moisture == "x100" ~ "High",
+    TRUE ~ "Low"
+  ))
+
+#assign counts table to matrix
+cts.final <- cts.0 %>%
+  column_to_rownames(var = "ko_id") %>%
+  select(-P08_x100_t3) %>%
+  as.matrix() 
+  
+
+#remove P08_x100_t3 and missing sample from cts
+coldata.final <- coldata.0 %>%
+  filter(SampleID %in% colnames(cts.final)) %>%
+  filter(SampleID != "P08_x100_t3") %>%
+  arrange(desc(SampleID)) %>%
+  column_to_rownames(var = "SampleID")
+  
+
+#ensure cts is also in assending order
+new_order = sort(colnames(cts.final),decreasing=TRUE)
+cts.final <- cts.final[, new_order]
+
+#subset to without t0 and filter to samples in at least 20% of samples
+coldata.no.t0 <- coldata.final %>%
+  filter(!str_detect(rownames(.), "t0")) 
+
+limit = round(nrow(coldata.no.t0)*0.2)
+
+cts.no.t0 <- cts.final %>%
+  as.data.frame() %>%
+  dplyr::select(!contains("t0")) %>%
+  mutate(sum.count = rowSums(.)) %>%
+  mutate(gr.zero = rowSums(. > 0)) %>%
+  filter(gr.zero > limit) %>%
+  mutate(sum.count.per = sum.count/sum(sum.count)) %>%
+  filter(sum.count.per > 0.00000001) %>%
+  dplyr::select(-c(gr.zero, sum.count.per, sum.count)) 
+
+```
+
+
+
+
+#create dds object for all timepoints
+```{r create_deseq2_object_reference_LD}
+
+###create a deseq2 object with Condition, Time, and Site as design###
+coldata.final$Moisture <- factor(coldata.final$Moisture, c("x50", "x100"))
+
+coldata.final$Moisture <- relevel(coldata.final$Moisture, ref = "x50")
+
+
+dds.t0 <- DESeqDataSetFromMatrix(countData = cts.final,
+                              colData = coldata.final,
+                              design= ~ Moisture + Timepoint)
+```
+
+
+
+```{r data_exploration}
+vstcounts <- vst(dds.t0, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+# export VST transformed table to be used for downstream analyses
+write.csv(vst.export, "../output/metaT/vst-ko.csv")
+
+
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("Timepoint"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+```
+```{r}
+dds.t0.object <- DESeq(dds.t0)
+resultsNames(dds.t0.object) # lists the coefficients
+
+res <- results(dds.t0.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../deseq2_ko_res.csv")
+
+```
+
+
+
+#####create dds object for data without t0
+```{r create_deseq2_object_reference_LD}
+
+###create a deseq2 object with Moisture and timepoint
+coldata.no.t0$Moisture <- factor(coldata.no.t0$Moisture, c("x50", "x100"))
+
+coldata.no.t0$Moisture <- relevel(coldata.no.t0$Moisture, ref = "x50")
+
+
+dds.no.t0 <- DESeqDataSetFromMatrix(countData = cts.no.t0,
+                              colData = coldata.no.t0,
+                              design= ~ Moisture * Timepoint)
+
+###create a deseq2 object with CGE level
+coldata.no.t0$CGE <- factor(coldata.no.t0$CGE, c("High", "Low"))
+
+coldata.no.t0$CGE <- relevel(coldata.no.t0$CGE, ref = "Low")
+
+
+dds.no.t0.cge <- DESeqDataSetFromMatrix(countData = cts.no.t0,
+                              colData = coldata.no.t0,
+                              design= ~ CGE)
+```
+
+
+
+```{r data_exploration}
+vstcounts <- vst(dds.no.t0, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+# export VST transformed table to be used for downstream analyses
+write.csv(vst.export, "../output/metaT/vst-ko-no-t0.csv")
+
+
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("CGE"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+#
+
+```
+```{r}
+dds.no.t0.object <- DESeq(dds.no.t0)
+resultsNames(dds.no.t0.object) # lists the coefficients
+
+res <- results(dds.no.t0.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../deseq2_no_t0_ko_res.csv")
+```
+```{r data_exploration}
+vstcounts <- vst(dds.no.t0.cge, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("CGE"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+#
+
+```
+```{r}
+dds.no.t0.cge.object <- DESeq(dds.no.t0.cge)
+resultsNames(dds.no.t0.cge.object) # lists the coefficients
+
+res <- results(dds.no.t0.cge.object, contrast = c("CGE","High","Low"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../output/metaT/deseq2_no_t0_ko_res_cge.csv")
+```

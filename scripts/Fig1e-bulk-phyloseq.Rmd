@@ -1,0 +1,513 @@
+---
+title: "PhyloseqAndDeseq2"
+author: "Linnea Honeker"
+date: "1/18/2024"
+output: html_document
+---
+# mac analysis for Parker
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("DESeq2")
+packageVersion("DESeq2")
+library("phyloseq")
+library(dplyr)
+library(knitr)
+library(apeglm)
+library("ggplot2")
+library("pheatmap")
+library("stringr")
+library(tidyverse)
+library(cowplot)
+library(reshape2)
+library(heatmaply)
+library(dada2)
+library(phangorn)
+library(microbiome)
+library(RColorBrewer)
+library(pgirmess)
+library(vegan)
+library(factoextra)
+library(ggfortify)
+library(ggnewscale)
+library(ggrepel)
+library(viridis)
+
+#load functions
+source("./NMDS-functions.R")
+
+#set aestetics
+col_list_2 <- c( "chartreuse3", "darkseagreen1","orange","lightgoldenrod","blue","lightblue", 
+                             "orange4", "yellow2", "red4","tan", "brown1","darkorchid", "plum2","darkturquoise", "aquamarine2",
+                              "hotpink4", "lightpink", "slateblue4", "lightslateblue", "darkgoldenrod", "moccasin","navy", "lightsteelblue3", 
+                       "darksalmon","bisque", "blueviolet", "violet","cyan4","cyan",
+                             "coral4","coral","darkred", "deeppink",
+                             "darkslateblue","cornflowerblue")
+
+
+list_of_shapes <- c(15,16,17,18,3,7,8,9,10,4,11,12,13,14)
+
+
+# parameters for plots
+h = 6
+w = 7
+res = 300
+size = 10
+
+
+```
+
+## Create phyloseq object
+```{r phyloseq object, echo=FALSE}
+###load data and reformat to convert to phyloseq object
+#look at microbial community composition at time 0
+data.all <- read.table("../data/ASV_table_reads_with_sample_info.txt", header=T, sep="\t", stringsAsFactors=T, check.names=F) #Note that this input has total copies of 16S in original binned 
+#SIP fractions to account for the different volumes - See line 435 for further explanation
+
+#reanme treatment column for downstream analyses
+data.all.2 <- data.all %>%
+    mutate(treatment = gsub('50%', 'm50', treatment)) %>%
+    mutate(treatment = gsub('100%', 'm100', treatment))
+
+
+##load data and reformat to convert to phyloseq object -> normalize read counts to copy numbers per fraction
+# First, create a dataframe showing fraction of tube total copies in each fraction
+copies_norm <- data.all.2 %>%
+  select( Replicate, treatment, Isotope,
+          Hour, fraction, copies.ul.total) %>%
+    unite(SampleID, c("treatment", "Hour", "Replicate", "Isotope")) %>%
+  spread(key = fraction, value = copies.ul.total) %>%
+  mutate(copies.tube = f1 + f2 + f3 + f4 + f5) %>%
+  mutate(f1_norm = f1/copies.tube) %>%
+  mutate(f2_norm = f2/copies.tube) %>%
+  mutate(f3_norm = f3/copies.tube) %>%
+  mutate(f4_norm = f4/copies.tube) %>%
+  mutate(f5_norm = f5/copies.tube) %>%
+  select(SampleID, f1_norm, f2_norm, f3_norm, f4_norm, f5_norm)
+
+#create data frame showing relative abundance of each ASV
+#gather dataframe to make calculated relative abundances easier
+
+counts_RA.0 <- data.all.2 %>%
+ select(Replicate, treatment, 
+          Hour, Isotope, fraction, 
+          where( ~ is.numeric(.x) && sum(.x) != 0), -tube, -Density, -copies.ul.total, -copies.ul) %>%
+    unite(SampleID, c("treatment", "Hour", "Replicate", "Isotope")) %>%
+  gather(key = "ASV_ID", value = "Counts", -c(SampleID, fraction)) %>%
+  group_by(SampleID, fraction) %>%
+  mutate(RelAbun = Counts / sum(Counts))
+
+#spread dataframe of RAs back out
+counts_RA <- counts_RA.0 %>%
+  select(-Counts) %>%
+  spread(key = ASV_ID, value = RelAbun)
+
+#add a total reads column 
+counts_total <- data.all.2 %>%
+ select(Replicate, treatment, 
+          Hour, Isotope, fraction, 
+          where( ~ is.numeric(.x) && sum(.x) != 0), -tube, -Density, -copies.ul.total, -copies.ul) %>%
+    unite(SampleID, c("treatment", "Hour", "Replicate", "Isotope")) %>%
+  mutate(total_reads = rowSums(.[3:4263]))
+
+#create column with new count (old total count per fraction * normalized copy for each fraction). First, merge total coutns with copies_norm
+reads_new_total <- copies_norm %>%
+  merge(counts_total, by = "SampleID") %>%
+  select(SampleID, f1_norm, f2_norm, f3_norm, f4_norm, f5_norm, total_reads) %>%
+  mutate(f1 = as.integer(f1_norm * total_reads)) %>%
+  mutate(f2 = as.integer(f2_norm * total_reads)) %>%
+  mutate(f3 = as.integer(f3_norm * total_reads)) %>%
+  mutate(f4 = as.integer(f4_norm * total_reads)) %>%
+  mutate(f5 = as.integer(f5_norm * total_reads)) %>%
+  select(-f1_norm, -f2_norm, -f3_norm, -f4_norm, -f5_norm, -total_reads) %>%
+  gather(key = "fraction", value = "new_count", -SampleID)
+
+#merge new total counts with relative abundance table. Multiply each ASV rel abundance by new total count. Summarize by counts per tube.
+norm_ASV_table <- reads_new_total %>%
+  merge(counts_RA, by = c("SampleID", "fraction")) %>%
+   mutate_each(funs(.*new_count), starts_with("sip")) %>%
+  separate(SampleID, c("treatment", "Hour", "Replicate", "Isotope"), remove = TRUE) %>%
+  select(-new_count) %>%
+  group_by(treatment, Hour, Isotope,  Replicate) %>%
+  summarise_at(vars(sip1:sip9983), ~ sum (.x, na.rm = TRUE)) %>%
+  mutate_if(is.numeric, as.integer) %>%
+  unite(SampleID, c("treatment", "Hour", "Replicate", "Isotope"), remove = FALSE) %>%
+  column_to_rownames(var = "SampleID")
+
+#transpose ASV table so that samples are rows and asvs are columns
+
+#norm_ASV_tabel.t <- t(norm_ASV_table)
+
+#separate out metadata and otu table matrix
+data.otu <- norm_ASV_table %>%
+  select(sip1:sip9983) 
+
+data.otu.t <- as.matrix(t(data.otu))
+
+
+
+data.meta <- norm_ASV_table %>%
+ select(treatment, Hour, Replicate, Isotope) %>%
+  mutate(subject_id = case_when(
+    (Replicate == "rA" & treatment == "m50") ~ "P09",
+     (Replicate == "rB" & treatment == "m50") ~ "P10",
+     (Replicate =="rC" & treatment == "m50") ~ "P13",
+     (Replicate == "rA" & treatment == "m100") ~ "P08",
+     (Replicate == "rB" & treatment == "m100") ~ "P14",
+     (Replicate =="rC" & treatment == "m100") ~ "P16")
+    )
+
+
+#Import taxa legend:
+taxa.id <- read.table("../data/taxonomy_table_reads.txt", 
+                      header=F, sep="\t", stringsAsFactors=T, check.names=F, 
+                      na.strings = "", col.names = c("taxon","code"))
+taxa.id2 <- taxa.id %>%
+  column_to_rownames(var = "taxon") %>%
+  separate(code, c("Domain", "Phylum", "Class", "Order", "Family", "Genus"), sep = ";")
+
+taxa.mat <- as.matrix(taxa.id2)
+```
+  
+
+####create phyloseq objects
+```{r phyloseq}
+otu = otu_table(data.otu.t, taxa_are_rows = TRUE)
+
+map = sample_data(data.meta)
+
+tax = tax_table(taxa.mat,errorIfNULL = TRUE)
+
+
+#merge otu-table, sample-metadata, taxonomy, and tree
+Data= merge_phyloseq(otu,map,tax)#,tree)
+Data
+taxa_are_rows(Data)
+
+
+
+#filter 50% moisture
+Data.50 = subset_samples(Data, treatment == "m50")
+
+#filter to 100% moisture
+Data.100 = subset_samples(Data, treatment == "m100")
+
+#filter to 16O
+Data.16O = subset_samples(Data, Isotope == "16O")
+
+
+
+
+```
+
+```{r create 'omics dataset}
+#create omics dataset with universal sample ids to be combined with other omics
+#transpose and take log2  
+otu.log.0 <- log2(data.otu + 1)
+
+otu.omics <- as.data.frame(otu.log.0) %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("moisture", "timepoint", "Replicate", "isotope"), sep = "_") %>%
+  mutate(moisture = gsub("m50", "x50", moisture)) |>
+  mutate(moisture = gsub("m100", "x100", moisture)) |>
+   mutate(subject_id = case_when(
+    (Replicate == "rA" & moisture == "x50") ~ "P09",
+     (Replicate == "rB" & moisture == "x50") ~ "P10",
+     (Replicate =="rC" & moisture == "x50") ~ "P13",
+     (Replicate == "rA" & moisture == "x100") ~ "P08",
+     (Replicate == "rB" & moisture == "x100") ~ "P14",
+     (Replicate =="rC" & moisture == "x100") ~ "P16")
+    ) |>
+  filter(isotope == "16O") |>
+  unite(SampleID, c("subject_id", "moisture", "timepoint"), sep = "_") |>
+  select(-isotope, -Replicate) |>
+  column_to_rownames(var = "SampleID")
+
+write.csv(otu.omics, "../output/omics_datasets/otu.csv")
+
+#save taxonomy table
+taxa.omics <- as.data.frame(taxa.mat)
+write.csv(taxa.omics, "../output/omics_datasets/taxa.csv")
+
+#save metadata table
+meta.omics <- data.meta %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("moisture", "timepoint", "Replicate", "isotope"), sep = "_") %>%
+ mutate(moisture = gsub("m50", "x50", moisture)) %>%
+  mutate(moisture = gsub("m100", "x100", moisture)) %>%
+   mutate(subject_id = case_when(
+    (Replicate == "rA" & moisture == "x50") ~ "P9",
+     (Replicate == "rB" & moisture == "x50") ~ "P10",
+     (Replicate =="rC" & moisture == "x50") ~ "P13",
+     (Replicate == "rA" & moisture == "x100") ~ "P8",
+     (Replicate == "rB" & moisture == "x100") ~ "P14",
+     (Replicate =="rC" & moisture == "x100") ~ "P16")
+    ) |>
+  filter(isotope == "16O") %>%
+  unite(SampleID, c("subject_id", "moisture", "timepoint"), sep = "_", remove = FALSE) %>%
+  select(-isotope, -Replicate, -Hour, -Isotope, -Replicate, -treatment) %>%
+  arrange(SampleID)%>%
+  column_to_rownames(var = "SampleID")
+
+write.csv(meta.omics, "../output/omics_datasets/metadata.csv")
+
+```
+
+
+## Steps:
+### filter phylseq object to remove low sequence counts ( < 0.01%) and rarefy
+```{r filter, include  = FALSE}
+# all depths
+total_counts <-sum(taxa_sums(Data))
+threshold <- 0.00001*total_counts
+Data.f <- filter_taxa(Data, function(x) sum(x) > threshold, TRUE)
+
+Data.f.ra = rarefy_even_depth(Data.f,(min(sample_sums(Data.f))))
+
+# low moisture
+total_counts <-sum(taxa_sums(Data.50))
+threshold <- 0.00001*total_counts
+Data.50.f <- filter_taxa(Data.50, function(x) sum(x) > threshold, TRUE)
+
+Data.50.f.ra = rarefy_even_depth(Data.50.f,(min(sample_sums(Data.50.f))))
+
+# high moisture
+total_counts <-sum(taxa_sums(Data.100))
+threshold <- 0.00001*total_counts
+Data.100.f <- filter_taxa(Data.100, function(x) sum(x) > threshold, TRUE)
+
+Data.100.f.ra = rarefy_even_depth(Data.100.f,(min(sample_sums(Data.100.f))))
+
+# 16O
+total_counts <-sum(taxa_sums(Data.16O))
+threshold <- 0.00001*total_counts
+Data.16O.f <- filter_taxa(Data.16O, function(x) sum(x) > threshold, TRUE)
+
+Data.16O.f.ra = rarefy_even_depth(Data.16O.f,(min(sample_sums(Data.16O.f))))
+```
+
+### taxonomy plots
+phylum 16O only
+```{r taxonomy phylum, echo = FALSE}
+
+#taxonomy--------------------------------------------------------
+#prune out phyla below 2% in each sample for all experiments
+Data.f.rel.abun <- transform_sample_counts(Data.f, function(x) x/sum(x)) #convert counts to relative abundances
+Data.f.glom <- tax_glom(Data.f.rel.abun, taxrank = "Phylum") #agglomerate taxa to Phylum-level
+Data.f.dat <- psmelt(Data.f.glom)
+Data.f.dat$Phylum <- as.character(Data.f.dat$Phylum) #convert to character vector from factor
+Data.f.dat$Phylum[Data.f.dat$Abundance < 0.02] <- "Phylum < 2%"
+
+
+#######plot Phylum######################################
+#all time points
+#change order of facets (facet by moisture)
+Data.f.dat$Hour <- factor(Data.f.dat$Hour, 
+                        levels =c("t0", "t3", "t24", "t48", "t72", "t168"))
+Data.f.dat$treatment <- factor(Data.f.dat$treatment, 
+       levels =c("m50", "m100")) 
+
+Data.f.dat <- Data.f.dat %>%
+  mutate(Phylum = str_remove(Data.f.dat$Phylum, "p_"))
+
+p <- ggplot(Data.f.dat, aes(x=Hour, y = Abundance, fill=Phylum)) 
+
+p.phylum <- p + geom_bar(aes(), stat = "identity", position = "fill") +
+  scale_fill_manual(values=col_list_2) +
+  facet_wrap(~ treatment) +
+  labs(y= "Relative abundance") +
+  scale_x_discrete(labels = c("0", "3", "24", "48", "72", "168")) +
+  theme_bw() +
+  theme(text = element_text(size = 16),
+        axis.text.x=element_text(size=12, angle=0,hjust =0.5)) 
+
+p.phylum
+ggsave("../figures/Fig1-taxon-specific-growth-rates/Fig1e-bulk-community-profiles.png",units=c('in'),width=8,height=5,dpi=300,p.phylum)
+ggsave("../figures/Fig1-taxon-specific-growth-rates/Fig1e-bulk-community-profiles.pdf",units=c('in'),width=8,height=5,dpi=300,p.phylum)
+
+
+```
+
+
+
+
+
+
+## NMDS
+```{r beta diversity, include = FALSE}
+my.ord.jaccard <- ordinate(
+ physeq = Data.f.ra,
+  method = "PCoA",
+  distance = "bray")
+  #weighted=TRUE)
+
+data.scores <- my.ord.jaccard$vectors %>%
+  as.data.frame() %>%
+  select(Axis.1, Axis.2) %>%
+  rename(NMDS1 = Axis.1) %>%
+  rename(NMDS2 = Axis.2) %>%
+  rownames_to_column(var = "SampleID") %>%
+  separate(SampleID, c("moisture", "timepoint", "plot", "isotope"), remove = FALSE) %>%
+  mutate(moisture = str_replace(moisture, "m100", "x100")) %>%
+  mutate(moisture = str_replace(moisture, "m50", "x50")) %>%
+  column_to_rownames(var = "SampleID")
+
+plot <- make_nmds_plot_time(data.scores)
+
+filename <- paste0("../figures/FigS1-NMDS/16S-nmds-bray.png")
+ggsave(filename,units=c('in'),width=w,height=h,dpi=res)
+
+filename <- paste0("../figures/FigS1-NMDS/16S-nmds-bray.pdf")
+ggsave(filename,units=c('in'),width=w,height=h,dpi=res)
+
+
+plot <- make_nmds_plot_plot(data.scores)
+
+```
+
+
+
+##beta diversity statistics
+```{r}
+#create a bray curtis distance matrix
+Data.f.ra.bray <- phyloseq::distance(Data.f.ra, method = "bray")
+
+#making a data frame from the sample_data
+sampledf <- data.frame(sample_data(Data.f.ra))
+
+#running adonis test
+adonis2(Data.f.ra.bray ~ Hour + treatment  + subject_id , data = sampledf)
+
+# adonis2(formula = Data.f.ra.bray ~ Hour + treatment + subject_id, data = sampledf)
+#          Df SumOfSqs     R2      F Pr(>F)    
+# Model    10   2.7675 0.5055 5.6224  0.001 ***
+# Residual 55   2.7072 0.4945                  
+# Total    65   5.4747 1.0000  
+
+adonis2(Data.f.ra.bray ~ Hour, data = sampledf)
+# adonis2(formula = Data.f.ra.bray ~ Hour, data = sampledf)
+#          Df SumOfSqs      R2      F Pr(>F)    
+# Model     5   0.8131 0.14852 2.0932  0.001 ***
+# Residual 60   4.6616 0.85148                  
+# Total    65   5.4747 1.00000    
+
+adonis2(Data.f.ra.bray ~ treatment, data = sampledf)
+# adonis2(formula = Data.f.ra.bray ~ treatment, data = sampledf)
+#          Df SumOfSqs      R2      F Pr(>F)    
+# Model     1   0.8852 0.16169 12.344  0.001 ***
+# Residual 64   4.5895 0.83831                  
+# Total    65   5.4747 1.00000   
+
+adonis2(Data.f.ra.bray ~ subject_id, data = sampledf)
+# adonis2(formula = Data.f.ra.bray ~ subject_id, data = sampledf)
+#          Df SumOfSqs      R2      F Pr(>F)    
+# Model     5   1.9544 0.35698 6.6619  0.001 ***
+# Residual 60   3.5203 0.64302                  
+# Total    65   5.4747 1.00000    
+```
+```{r lme}
+library(emmeans)
+
+##linear mixed effects model on phyla across all timepoints
+
+#firmicutes
+Firm <- Data.f.dat %>%
+  filter(Phylum == "Firmicutes")
+
+m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Firm)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                  Sum Sq   Mean Sq NumDF  DenDF F value    Pr(>F)    
+# treatment      0.000233 0.0002326     1  4.026  0.4849    0.5243    
+# Hour           0.044305 0.0088610     5 50.000 18.4722 2.378e-10 ***
+# treatment:Hour 0.003813 0.0007626     5 50.000  1.5897    0.1802    
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ treatment | Hour)
+pairs(em, adjust="tukey")
+
+
+#proteobacteria
+Proteo <- Data.f.dat %>%
+  filter(Phylum == "Proteobacteria")
+
+m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Proteo)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                  Sum Sq  Mean Sq NumDF  DenDF F value    Pr(>F)    
+# treatment      0.052706 0.052706     1  4.296 18.7111 0.0105920 *  
+# Hour           0.085928 0.017186     5 50.000  6.1011 0.0001745 ***
+# treatment:Hour 0.019690 0.003938     5 50.000  1.3980 0.2411272 
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ treatment | Hour)
+pairs(em, adjust="tukey")
+
+# Hour = t0:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.1452 0.0451 48.7  -3.220  0.0023
+# 
+# Hour = t3:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.1194 0.0331 31.2  -3.609  0.0011
+# 
+# Hour = t24:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.0567 0.0331 31.2  -1.715  0.0963
+# 
+# Hour = t48:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.0427 0.0331 31.2  -1.291  0.2063
+# 
+# Hour = t72:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.0631 0.0331 31.2  -1.907  0.0658
+# 
+# Hour = t168:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100  -0.0501 0.0331 31.2  -1.514  0.1400
+
+#Actinobacteria
+Actino <- Data.f.dat %>%
+  filter(Phylum == "Actinobacteria")
+
+m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Actino)
+anova(m)
+# Type III Analysis of Variance Table with Satterthwaite's method
+#                  Sum Sq  Mean Sq NumDF DenDF F value    Pr(>F)    
+# treatment      0.078299 0.078299     1    54 50.4711 2.789e-09 ***
+# Hour           0.084725 0.016945     5    54 10.9227 2.714e-07 ***
+# treatment:Hour 0.010566 0.002113     5    54  1.3622    0.2531    
+
+# Post-hoc pairwise contrasts at each timepoint
+em    <- emmeans(m, ~ treatment | Hour)
+pairs(em, adjust="tukey")
+
+# Hour = t0:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.1217 0.0322 53.8   3.783  0.0004
+# 
+# Hour = t3:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.0931 0.0227 46.2   4.093  0.0002
+# 
+# Hour = t24:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.0619 0.0227 46.2   2.722  0.0091
+# 
+# Hour = t48:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.0656 0.0227 46.2   2.886  0.0059
+# 
+# Hour = t72:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.0506 0.0227 46.2   2.226  0.0309
+# 
+# Hour = t168:
+#  contrast   estimate     SE   df t.ratio p.value
+#  m50 - m100   0.0346 0.0227 46.2   1.519  0.1355
+
+
+```
+
