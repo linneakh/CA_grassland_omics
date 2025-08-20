@@ -79,22 +79,6 @@ Dir.o = "./output/50-growth-rates/"
   data <- data.all
 
 
-#Plot density curves - not run here (this is example code for Evan's data), but can be useful to QC data:
-  # dev.off()
-  # par(mfrow=c(3,1))
-  # wks <- levels(factor(as.character(data$week)))
-  # for (i in 1:length(wks)){
-  #   plot(x=data$Density[data$Isotope == "12C" & data$week == wks[i]], y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], pch=21, bg="dodgerblue", col="black", xlim=c(min(data$Density), max(data$Density)), ylim=c(min(data$DNA.ng.fraction), max(data$DNA.ng.fraction)), xlab="density (g/ml)", ylab="[DNA] (ng/fraction)", main=paste("week ", wks[i], sep=""), cex=1.5)
-  #   points(x=data$Density[data$Isotope == "13C" & data$week == wks[i]], y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], pch=21, bg="yellow", col="black", cex=1.5)
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], x=data$Density[data$Isotope == "12C" & data$week == wks[i]]), lwd=3, col="black")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], x=data$Density[data$Isotope == "12C" & data$week == wks[i]]), lwd=1.5, col="dodgerblue")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], x=data$Density[data$Isotope == "13C" & data$week == wks[i]]), lwd=3, col="black")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], x=data$Density[data$Isotope == "13C" & data$week == wks[i]]), lwd=1.5, col="yellow")
-  # }
-  # par(mfrow=c(1,1))
-  #
-  #
-  # dev.off()
 
 
 #Create a column of unique tube IDs (where a unique tube is a combination of Hour, Isotope, Replicate, and I added treatment for 4th wedge)

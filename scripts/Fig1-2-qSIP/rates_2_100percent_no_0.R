@@ -1,6 +1,6 @@
 #Reload the saved workspace resulting from the previous script (above):
 Dir.o = "./output/100-growth-rates/"
-load("./qSIP_workspaces/100_SB_01.RData")
+#load("./qSIP_workspaces/100_SB_01.RData")
       
     
       ##########  Calculate & verify birth, death, net growth, and flux rates & ape & N:

@@ -79,22 +79,6 @@ Dir.o = "./output/100-growth-rates/"
   data <- data.all
 
 
-#Plot density curves - not run here (this is example code for Evan's data), but can be useful to QC data:
-  # dev.off()
-  # par(mfrow=c(3,1))
-  # wks <- levels(factor(as.character(data$week)))
-  # for (i in 1:length(wks)){
-  #   plot(x=data$Density[data$Isotope == "12C" & data$week == wks[i]], y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], pch=21, bg="dodgerblue", col="black", xlim=c(min(data$Density), max(data$Density)), ylim=c(min(data$DNA.ng.fraction), max(data$DNA.ng.fraction)), xlab="density (g/ml)", ylab="[DNA] (ng/fraction)", main=paste("week ", wks[i], sep=""), cex=1.5)
-  #   points(x=data$Density[data$Isotope == "13C" & data$week == wks[i]], y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], pch=21, bg="yellow", col="black", cex=1.5)
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], x=data$Density[data$Isotope == "12C" & data$week == wks[i]]), lwd=3, col="black")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "12C" & data$week == wks[i]], x=data$Density[data$Isotope == "12C" & data$week == wks[i]]), lwd=1.5, col="dodgerblue")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], x=data$Density[data$Isotope == "13C" & data$week == wks[i]]), lwd=3, col="black")
-  #   abline(v=WAD.func(y=data$DNA.ng.fraction[data$Isotope == "13C" & data$week == wks[i]], x=data$Density[data$Isotope == "13C" & data$week == wks[i]]), lwd=1.5, col="yellow")
-  # }
-  # par(mfrow=c(1,1))
-  #
-  #
-  # dev.off()
 
 
 #Create a column of unique tube IDs (where a unique tube is a combination of Hour, Isotope, Replicate, and I added treatment for 4th wedge)
@@ -186,28 +170,28 @@ Dir.o = "./output/100-growth-rates/"
 
 #Import data frame containing the treatment comparisons to perform:
 
-  Tcompare3 <- read.table("qSIP_data/SB_TreatmentComparisons_3.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
+  Tcompare3 <- read.table("./data/SB_TreatmentComparisons_3.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
   summary(Tcompare3)
   Tcompare3
 
-  Tcompare24 <- read.table("qSIP_data/SB_TreatmentComparisons_24.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
+  Tcompare24 <- read.table("./data/SB_TreatmentComparisons_24.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
   summary(Tcompare24)
   Tcompare24
   
-  Tcompare48 <- read.table("qSIP_data/SB_TreatmentComparisons_48.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
+  Tcompare48 <- read.table("./data/SB_TreatmentComparisons_48.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
   summary(Tcompare48)
   Tcompare48
   
   
-  Tcompare72 <- read.table("qSIP_data/SB_TreatmentComparisons_72.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
+  Tcompare72 <- read.table("./data/SB_TreatmentComparisons_72.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
   summary(Tcompare72)
   Tcompare72
   
-  Tcompare168 <- read.table("qSIP_data/SB_TreatmentComparisons_168.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
+  Tcompare168 <- read.table("./data/SB_TreatmentComparisons_168.txt", header=TRUE, sep="\t", colClasses=c("numeric","factor","character","character","character","numeric","character"))
   summary(Tcompare168)
   Tcompare168
   
-  TcompareTime0 <- read.table("qSIP_data/SB_TreatmentComparisons_Time0_all.txt", header=TRUE, sep="\t", colClasses=c("factor","character","character","numeric","character"))
+  TcompareTime0 <- read.table("./data/SB_TreatmentComparisons_Time0_all.txt", header=TRUE, sep="\t", colClasses=c("factor","character","character","numeric","character"))
   summary(TcompareTime0)
   TcompareTime0
 
@@ -327,120 +311,16 @@ Dir.o = "./output/100-growth-rates/"
       copies.tube.melted.168 <- as.data.frame(lapply(copies.tube.melted.168, function(x) if(is.factor(x)) factor(x) else x))
       sum(levels(copies.tube.melted.168$taxon) != levels(data.melted.168$taxon))
 
-  #For the 3-24 hour growth calculation, we don't want to filter out all taxa that are missing at one time or another; we want to assign those taxa abundances of 0.5*detection limit:
-    levels(data.melted.3$taxon)
-    levels(data.melted.24$taxon)
-    taxa.shared.3.24 <- intersect(levels(data.melted.3$taxon), levels(data.melted.24$taxon))
-    taxa.at.3.only <- setdiff(levels(data.melted.3$taxon), levels(data.melted.24$taxon))
-    taxa.at.24.only <- setdiff(levels(data.melted.24$taxon), levels(data.melted.3$taxon))
-    taxa.missing.3.24 <- setdiff(setdiff(levels(data.melted$taxon), levels(data.melted.3$taxon)), levels(data.melted.24$taxon))
-    copies.tube.melted.3.24 <- copies.tube.melted
-    copies.tube.melted.3.24 <- copies.tube.melted.3.24[copies.tube.melted.3.24$unique.tmt %in% c("t3_18O", "t24_18O") & copies.tube.melted.3.24$taxon %in% c(taxa.shared.3.24, taxa.at.3.only, taxa.at.24.only),]
-    #Renumber row.names
-      row.names(copies.tube.melted.3.24)<- 1:dim(copies.tube.melted.3.24)[1]
-    #Convert the factor columns to factor:
-      copies.tube.melted.3.24 <- as.data.frame(lapply(copies.tube.melted.3.24, function(x) if(is.factor(x)) factor(x) else x))
-      levels(copies.tube.melted.3.24$taxon)
-      taxa.shared.3.24
-      taxa.at.3.only
-      taxa.at.24.only
-    #Assign a tiny abundance to those taxa that are missing in one time point but not the other:
-    #Get the tiny abundance:
-      all.copies <- sort(as.numeric(unlist(copies[,13:dim(copies)[2]])))
-      min(all.copies[all.copies > 0])
-      tiny.abundance <- min(all.copies[all.copies > 0])*0.5
-    copies.tube.melted.3.24$t.copies.ul[copies.tube.melted.3.24$taxon %in% taxa.at.3.only & copies.tube.melted.3.24$unique.tmt == "t24_18O" & copies.tube.melted.3.24$t.copies.ul == 0] <- tiny.abundance
-    copies.tube.melted.3.24$t.copies.ul[copies.tube.melted.3.24$taxon %in% taxa.at.24.only & copies.tube.melted.3.24$unique.tmt == "t3_18O" & copies.tube.melted.3.24$t.copies.ul == 0] <- tiny.abundance
-
-  #For the 24-48 hour growth calculation, we don't want to filter out all taxa that are missing at one time or another; we want to assign those taxa abundances of 0.5*detection limit:
-    levels(data.melted.24$taxon)
-    levels(data.melted.48$taxon)
-    taxa.shared.24.48 <- intersect(levels(data.melted.24$taxon), levels(data.melted.48$taxon))
-    taxa.at.24.only <- setdiff(levels(data.melted.24$taxon), levels(data.melted.48$taxon))
-    taxa.at.48.only <- setdiff(levels(data.melted.48$taxon), levels(data.melted.24$taxon))
-    taxa.missing.24.48 <- setdiff(setdiff(levels(data.melted$taxon), levels(data.melted.24$taxon)), levels(data.melted.48$taxon))
-    copies.tube.melted.24.48 <- copies.tube.melted
-    copies.tube.melted.24.48 <- copies.tube.melted.24.48[copies.tube.melted.24.48$unique.tmt %in% c("t24_18O", "t48_18O") & copies.tube.melted.24.48$taxon %in% c(taxa.shared.24.48, taxa.at.24.only, taxa.at.48.only),]
-    #Renumber row.names
-      row.names(copies.tube.melted.24.48)<- 1:dim(copies.tube.melted.24.48)[1]
-    #Convert the factor columns to factor:
-      copies.tube.melted.24.48 <- as.data.frame(lapply(copies.tube.melted.24.48, function(x) if(is.factor(x)) factor(x) else x))
-      levels(copies.tube.melted.24.48$taxon)
-      taxa.shared.24.48
-      taxa.at.24.only
-      taxa.at.48.only
-    #Assign a tiny abundance to those taxa that are missing in one time point but not the other:
-    copies.tube.melted.24.48$t.copies.ul[copies.tube.melted.24.48$taxon %in% taxa.at.24.only & copies.tube.melted.24.48$unique.tmt == "t48_18O" & copies.tube.melted.24.48$t.copies.ul == 0] <- tiny.abundance
-    copies.tube.melted.24.48$t.copies.ul[copies.tube.melted.24.48$taxon %in% taxa.at.48.only & copies.tube.melted.24.48$unique.tmt == "t24_18O" & copies.tube.melted.24.48$t.copies.ul == 0] <- tiny.abundance
-
-    #For the 48-72 hour growth calculation, we don't want to filter out all taxa that are missing at one time or another; we want to assign those taxa abundances of 0.5*detection limit:
-    levels(data.melted.48$taxon)
-    levels(data.melted.72$taxon)
-    taxa.shared.48.72 <- intersect(levels(data.melted.48$taxon), levels(data.melted.72$taxon))
-    taxa.at.48.only <- setdiff(levels(data.melted.48$taxon), levels(data.melted.72$taxon))
-    taxa.at.72.only <- setdiff(levels(data.melted.72$taxon), levels(data.melted.48$taxon))
-    taxa.missing.48.72 <- setdiff(setdiff(levels(data.melted$taxon), levels(data.melted.48$taxon)), levels(data.melted.72$taxon))
-    copies.tube.melted.48.72 <- copies.tube.melted
-    copies.tube.melted.48.72 <- copies.tube.melted.48.72[copies.tube.melted.48.72$unique.tmt %in% c("t48_18O", "t72_18O") & copies.tube.melted.48.72$taxon %in% c(taxa.shared.48.72, taxa.at.48.only, taxa.at.72.only),]
-    #Renumber row.names
-    row.names(copies.tube.melted.48.72)<- 1:dim(copies.tube.melted.48.72)[1]
-    #Convert the factor columns to factor:
-    copies.tube.melted.48.72 <- as.data.frame(lapply(copies.tube.melted.48.72, function(x) if(is.factor(x)) factor(x) else x))
-    levels(copies.tube.melted.48.72$taxon)
-    taxa.shared.48.72
-    taxa.at.48.only
-    taxa.at.72.only
-    #Assign a tiny abundance to those taxa that are missing in one time point but not the other:
-    copies.tube.melted.48.72$t.copies.ul[copies.tube.melted.48.72$taxon %in% taxa.at.48.only & copies.tube.melted.48.72$unique.tmt == "t72_18O" & copies.tube.melted.48.72$t.copies.ul == 0] <- tiny.abundance
-    copies.tube.melted.48.72$t.copies.ul[copies.tube.melted.48.72$taxon %in% taxa.at.72.only & copies.tube.melted.48.72$unique.tmt == "t48_18O" & copies.tube.melted.48.72$t.copies.ul == 0] <- tiny.abundance
-    
-  #For the 72-168 hour growth calculation, we don't want to filter out all taxa that are missing at one time or another; we want to assign those taxa abundances of 0.5*detection limit:
-    levels(data.melted.72$taxon)
-    levels(data.melted.168$taxon)
-    taxa.shared.72.168 <- intersect(levels(data.melted.72$taxon), levels(data.melted.168$taxon))
-    taxa.at.72.only <- setdiff(levels(data.melted.72$taxon), levels(data.melted.168$taxon))
-    taxa.at.168.only <- setdiff(levels(data.melted.168$taxon), levels(data.melted.72$taxon))
-    taxa.missing.72.168 <- setdiff(setdiff(levels(data.melted$taxon), levels(data.melted.72$taxon)), levels(data.melted.168$taxon))
-    copies.tube.melted.72.168 <- copies.tube.melted
-    copies.tube.melted.72.168 <- copies.tube.melted.72.168[copies.tube.melted.72.168$unique.tmt %in% c("t72_18O", "t168_18O") & copies.tube.melted.72.168$taxon %in% c(taxa.shared.72.168, taxa.at.72.only, taxa.at.168.only),]
-    #Renumber row.names
-      row.names(copies.tube.melted.72.168)<- 1:dim(copies.tube.melted.72.168)[1]
-    #Convert the factor columns to factor:
-      copies.tube.melted.72.168 <- as.data.frame(lapply(copies.tube.melted.72.168, function(x) if(is.factor(x)) factor(x) else x))
-      levels(copies.tube.melted.72.168$taxon)
-      taxa.shared.72.168
-      taxa.at.72.only
-      taxa.at.168.only
-    #Assign a tiny abundance to those taxa that are missing in one time point but not the other:
-    copies.tube.melted.72.168$t.copies.ul[copies.tube.melted.72.168$taxon %in% taxa.at.72.only & copies.tube.melted.72.168$unique.tmt == "t168_18O" & copies.tube.melted.72.168$t.copies.ul == 0] <- tiny.abundance
-    copies.tube.melted.72.168$t.copies.ul[copies.tube.melted.72.168$taxon %in% taxa.at.168.only & copies.tube.melted.72.168$unique.tmt == "t72_18O" & copies.tube.melted.72.168$t.copies.ul == 0] <- tiny.abundance
-
+ 
 
 #Import soil extraction data with mass of soil represented by the DNA in each tube:
-  Sdat <- read.table("qSIP_data/copies_per_g_soil_50percent_FINAL.txt", header=TRUE, sep="\t")
+  Sdat <- read.table("./data/copies_per_g_soil_50percent.txt", header=TRUE, sep="\t")
   Sdat
   summary(Sdat)
 
 
   
-  ###added for Jeff to merge qSIP data files 12/13/22
-  write.table(data.melted.3, paste(Dir.o, "SB_data-melted-3_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(data.melted.24, paste(Dir.o,"SB_data-melted-24_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(data.melted.48, paste(Dir.o,"SB_data-melted-48_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(data.melted.72, paste(Dir.o,"SB_data-melted-72_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(data.melted.168, paste(Dir.o,"SB_data-melted-168_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
   
-  write.table(copies.tube.melted.3, paste(Dir.o,"SB_copies-tubes-melted-3_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(copies.tube.melted.24, paste(Dir.o,"SB_copies-tubes-melted-24_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(copies.tube.melted.48, paste(Dir.o,"SB_copies-tubes-melted-48_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(copies.tube.melted.72, paste(Dir.o,"SB_copies-tubes-melted-72_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  write.table(copies.tube.melted.168, paste(Dir.o,"SB_copies-tubes-melted-168_100percent.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-  
-  
-  
-  
-
-
 #GROSS GROWTH CALCULATIONS:
 
 #FOR 3 HOUR (takes ~5 minutes to run on Ben's MacBook Pro):
@@ -678,15 +558,13 @@ bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped
   write.table(all.comparisons.pop.168, paste(Dir.o, "SB_168hour_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
 
 
-
-
-#FOR 3-24 HOUR INTERVAL:
-#Calculate population-based r & flux for all taxa - NET REPLICATION:
-#NOTES: the treatments for time 0 and time t abundances are done in only one way: 3_18O and 24_18O
-#       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
-#       using system.time calculates how long it took the function to run
-#       use linear growth model
-#       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
+  #FOR 3-24 HOUR INTERVAL:
+  #Calculate population-based r & flux for all taxa - NET REPLICATION:
+  #NOTES: the treatments for time 0 and time t abundances are done in only one way: 3_18O and 24_18O
+  #       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
+  #       using system.time calculates how long it took the function to run
+  #       use linear growth model
+  #       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
   set.seed(100)
   system.time(all.comparisons.pop.3.24 <- all.taxa.calcs.pop(X.all=copies.tube.melted.3.24, comparisons=TcompareTime0[16,], M.soil=Sdat, vars=c("taxon", "t.copies.ul", "unique.tube", "unique.tmt", "g.dry.soil.tube"), growth.model="linear", vol=c(1, 1), copies.cell=6, pgC.cell=0.1, CI=0.95, draws=1000))
   bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped_C_fluxes_pop.txt", "bootstrapped_N_T0_pop.txt", "bootstrapped_N_Tt_pop.txt"), sep="")
@@ -694,21 +572,21 @@ bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped
   file.rename(from=bootstrapped.filenames, to=new.bootstrapped.filenames)
   summary(all.comparisons.pop.3.24)
   dim(all.comparisons.pop.3.24)
-
-
-#Write the results (all.comparisons.pop.3.24) to a text file:
+  
+  
+  #Write the results (all.comparisons.pop.3.24) to a text file:
   write.table(all.comparisons.pop.3.24, paste(Dir.o, "SB_3-24hour_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-
-
-
-
-#FOR 24-48 HOUR INTERVAL:
-#Calculate population-based r & flux for all taxa - NET REPLICATION:
-#NOTES: the treatments for time 0 and time t abundances are done in only one way: 24_18O and 48_18O
-#       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
-#       using system.time calculates how long it took the function to run
-#       use linear growth model
-#       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
+  
+  
+  
+  
+  #FOR 24-48 HOUR INTERVAL:
+  #Calculate population-based r & flux for all taxa - NET REPLICATION:
+  #NOTES: the treatments for time 0 and time t abundances are done in only one way: 24_18O and 48_18O
+  #       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
+  #       using system.time calculates how long it took the function to run
+  #       use linear growth model
+  #       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
   set.seed(100)
   system.time(all.comparisons.pop.24.48 <- all.taxa.calcs.pop(X.all=copies.tube.melted.24.48, comparisons=TcompareTime0[17,], M.soil=Sdat, vars=c("taxon", "t.copies.ul", "unique.tube", "unique.tmt", "g.dry.soil.tube"), growth.model="linear", vol=c(1, 1), copies.cell=6, pgC.cell=0.1, CI=0.95, draws=1000))
   bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped_C_fluxes_pop.txt", "bootstrapped_N_T0_pop.txt", "bootstrapped_N_Tt_pop.txt"), sep="")
@@ -716,11 +594,11 @@ bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped
   file.rename(from=bootstrapped.filenames, to=new.bootstrapped.filenames)
   summary(all.comparisons.pop.24.48)
   dim(all.comparisons.pop.24.48)
-
-
-#Write the results (all.comparisons.pop.24.48) to a text file:
+  
+  
+  #Write the results (all.comparisons.pop.24.48) to a text file:
   write.table(all.comparisons.pop.24.48, paste(Dir.o, "SB_24-48hour_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-
+  
   #FOR 48-72 HOUR INTERVAL:
   #Calculate population-based r & flux for all taxa - NET REPLICATION:
   #NOTES: the treatments for time 0 and time t abundances are done in only one way: 48_18O and 72_18O
@@ -740,15 +618,15 @@ bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped
   #Write the results (all.comparisons.pop.48.72) to a text file:
   write.table(all.comparisons.pop.48.72, paste(Dir.o, "SB_48-72hour_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
   
-
-
-#FOR 72-168 HOUR INTERVAL:
-#Calculate population-based r & flux for all taxa - NET REPLICATION:
-#NOTES: the treatments for time 0 and time t abundances are done in only one way: 72_18O and 168_18O
-#       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
-#       using system.time calculates how long it took the function to run
-#       use linear growth model
-#       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
+  
+  
+  #FOR 72-168 HOUR INTERVAL:
+  #Calculate population-based r & flux for all taxa - NET REPLICATION:
+  #NOTES: the treatments for time 0 and time t abundances are done in only one way: 72_18O and 168_18O
+  #       using set.seed ensures that subsequent function calls utilize the same random number seed, so results are replicated exactly)
+  #       using system.time calculates how long it took the function to run
+  #       use linear growth model
+  #       rename the bootstrapped output files so that they are not overwritten if 'all.taxa.calcs' is re-run
   set.seed(100)
   system.time(all.comparisons.pop.72.168 <- all.taxa.calcs.pop(X.all=copies.tube.melted.72.168, comparisons=TcompareTime0[19,], M.soil=Sdat, vars=c("taxon", "t.copies.ul", "unique.tube", "unique.tmt", "g.dry.soil.tube"), growth.model="linear", vol=c(1, 1), copies.cell=6, pgC.cell=0.1, CI=0.95, draws=1000))
   bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped_C_fluxes_pop.txt", "bootstrapped_N_T0_pop.txt", "bootstrapped_N_Tt_pop.txt"), sep="")
@@ -756,24 +634,26 @@ bootstrapped.filenames <- paste(Dir.o, c("bootstrapped_r_pop.txt", "bootstrapped
   file.rename(from=bootstrapped.filenames, to=new.bootstrapped.filenames)
   summary(all.comparisons.pop.72.168)
   dim(all.comparisons.pop.72.168)
-
-
-#Write the results (all.comparisons.pop.72.168) to a text file:
+  
+  
+  #Write the results (all.comparisons.pop.72.168) to a text file:
   write.table(all.comparisons.pop.72.168, paste(Dir.o, "SB_72-168hour_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-
-
-
-
-#Glue together the net growth output from each time interval:
+  
+  
+  
+  
+  #Glue together the net growth output from each time interval:
   all.comparisons.pop <- rbind(all.comparisons.pop.3, all.comparisons.pop.24, all.comparisons.pop.72, all.comparisons.pop.168, all.comparisons.pop.3.24, all.comparisons.pop.24.48, all.comparisons.pop.48.72, all.comparisons.pop.72.168)
   row.names(all.comparisons.pop)<- 1:dim(all.comparisons.pop)[1]     #renumber row.names
   all.comparisons.pop <- as.data.frame(lapply(all.comparisons.pop, function(x) if(is.factor(x)) factor(x) else x))     #convert the factor columns to factor:
-
-#Write the combined results (all.comparisons.pop) to a text file:
+  
+  #Write the combined results (all.comparisons.pop) to a text file:
   write.table(all.comparisons.pop, paste(Dir.o, "SB_all_comparisons_pop.txt", sep=""), append=F, quote=F, sep="\t", eol="\n", na="NA", dec=".", row.names=F, col.names=T)
-
-#Save workspace:
-  save(list=ls(all.names=TRUE), file="./qSIP_workspaces/100_SB_01.RData", envir=.GlobalEnv)
-
-
+  
+  #Save workspace:
+  #save(list=ls(all.names=TRUE), file="./qSIP_workspaces/100_SB_01_.RData", envir=.GlobalEnv)
+  
+  
+  
+  
 
