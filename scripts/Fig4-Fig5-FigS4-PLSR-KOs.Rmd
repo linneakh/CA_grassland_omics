@@ -220,8 +220,7 @@ ring.deg <- read.csv("../data/curated_ko_lists/degradation_rings.csv") %>%
   mutate(KO = str_replace(KO, "k", "K")) %>% 
   filter(KO != "")
 
-#co2 releasing
-co2 <- read.csv("../data/curated_ko_lists/CO2_releasing_KOs_core_set.csv")
+
 
 
 
@@ -240,7 +239,7 @@ aa.biosynthesis.merge <- aa.biosynthesis %>%
     grepl("chorismate", Shared2) ~ "Amino acid biosynthesis: Chorismate", 
     TRUE ~ "Amino acid bioysnthesis: shared or other"
   )) %>%
-  select(Biomolecule, KO, Subpathway) %>%
+  select(Biomolecule, KO, Subpathway, name) %>%
     mutate(Biomolecule = "Amino acid biosynthesis")
 
 lipid.biosynthesis.merge <- lipid.biosynthesis %>%
@@ -249,7 +248,7 @@ lipid.biosynthesis.merge <- lipid.biosynthesis %>%
     grepl("glycerol", Shared) ~ "Lipid biosynthesis: Glycerolipid",
     grepl("main", Shared) ~ "Lipid biosynthesis: Glycerophospholipid"
   )) %>%
-  select(Biomolecule, KO, Subpathway) %>%
+  select(Biomolecule, KO, Subpathway, name) %>%
     mutate(Biomolecule = "Lipid biosynthesis")
 
 nuc.biosynthesis.merge <- nuc.biosynthesis %>%
@@ -258,7 +257,7 @@ nuc.biosynthesis.merge <- nuc.biosynthesis %>%
     grepl("pyrimidine", Shared) ~ "Nucleotide biosynthesis: pyrimidine",
     grepl("ribonucleotide reductase", Shared) ~ "Nucleotide biosynthesis: ribonucleotide"
   )) %>%
-  select(Biomolecule, KO, Subpathway) %>%
+  select(Biomolecule, KO, Subpathway, name) %>%
   mutate(Biomolecule = "Nucleotide biosynthesis")
 
 eps.biosynthesis.merge <- eps.biosynthesis %>%
@@ -266,11 +265,11 @@ eps.biosynthesis.merge <- eps.biosynthesis %>%
     grepl("alginate", Shared2) ~ "EPS biosynthesis: Alginate",
     grepl("acetan", Shared2) ~ "EPS biosynthesis: Acetan/xanthan"
   )) %>%
-  select(Biomolecule, KO, Subpathway) %>%
+  select(Biomolecule, KO, Subpathway, name) %>%
   mutate(Biomolecule = "EPS biosynthesis")
 
 teich.biosynthesis.merge <- teich.biosynthesis %>%
-  select(Biomolecule, KO) %>%
+  select(Biomolecule, KO, name) %>%
   mutate(Biomolecule = "Teichoic acid biosynthesis") %>%
   mutate(Subpathway = "Teichoic acid biosynthesis: from UND-PP to wall teichoic acid")
 
@@ -280,19 +279,20 @@ wall.biosynthesis.merge <- wall.biosynthesis %>%
     grepl("remodeling", Shared) ~ "Peptidoglycan biosynthesis: Remodeling",
     grepl("PG", Shared) ~ "Peptidoglycan biosynthesis: Peptidoglycan unit synthesis"
   )) %>%
-  select(Biomolecule, KO, Subpathway) 
+  select(Biomolecule, KO, Subpathway, name) 
   
 biosynthesis <- rbind(aa.biosynthesis.merge, lipid.biosynthesis.merge, 
                       nuc.biosynthesis.merge, eps.biosynthesis.merge,
                       teich.biosynthesis.merge, wall.biosynthesis.merge) %>%
   rename(Pathway = Biomolecule) %>%
   mutate(Metabolism = "Biosynthesis") %>%
-  select(KO, Metabolism, Pathway, Subpathway)
+  select(KO, Metabolism, Pathway, Subpathway, name) %>%
+  rename(Name = name)
 
 
 ##Energy
 central.merge <- central %>%
-  select(KO, Metabolism, Shared, Shared2) %>%
+  select(KO, Metabolism, Shared, Shared2, Name) %>%
   unite(Metabolism, c("Metabolism", "Shared", "Shared2"), sep = "_") %>%
   mutate(Metabolism2 = case_when(
     grepl("Citrate cycle", Metabolism) ~ "Central C metabolism: TCA cycle",
@@ -312,12 +312,12 @@ central.merge <- central %>%
 atp.merge <- atp %>%
   mutate(Subpathway = paste("ATPase: ", Shared2, sep = "")) %>%
   mutate(Pathway = "ATPase") %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, Name)
 
 pomp.merge <- pomp %>%
   unite(Subpathway, c(Metabolism, Shared2), sep = ": ", remove = FALSE) %>%
   rename(Pathway = Metabolism) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, Name)
   
 
 ferm.merge <- ferm %>%
@@ -326,12 +326,12 @@ ferm.merge <- ferm %>%
     TRUE ~ Shared)) %>%
   mutate(Pathway = "Fermentation") %>%
   unite(Subpathway, c(Pathway, Shared), sep = ": ", remove = FALSE) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, Name)
 
 pyrox.merge <- pyrox %>%
   mutate(Pathway = "Pyruvate oxidation") %>%
   mutate(Subpathway = "Pyruvate oxidation: Pyruvate => acetyl-CoA") %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, Name)
 
 etc.merge <- etc %>%
   mutate(Pathway = "Electron transport chain") %>%
@@ -339,14 +339,14 @@ etc.merge <- etc %>%
     Shared == "nadh reductase" ~ "ETC: NADH reductase",
     Shared == "cyt c ox" ~ "ETC: Cytochrome C oxidase"
   )) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, Name)
 
 energy <- rbind(central.merge, atp.merge, 
                       pomp.merge, ferm.merge,
                       pyrox.merge,
                       etc.merge) %>%
   mutate(Metabolism = "Energy") %>%
-  select(KO, Metabolism, Pathway, Subpathway)
+  select(KO, Metabolism, Pathway, Subpathway, Name)
 
 ##Degradation
 aro.deg.merge <- aromatic.deg %>%
@@ -364,7 +364,7 @@ aro.deg.merge <- aromatic.deg %>%
     grepl("Furfural", Subpathway) ~ "Xenobiotics degradation: Furfural",
     grepl("Steroid", Subpathway) ~ "Xenobiotics degradation: Steroid",
   )) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, name)
 
 ring.deg.merge <- ring.deg %>%
   mutate(Pathway = "Aromatic ring degradation") %>%
@@ -377,7 +377,7 @@ ring.deg.merge <- ring.deg %>%
     grepl("polycyclic", Subpathway) ~ "Aromatic ring degradation: Ring removal from polycyclic aromatic ring",
     grepl("monooxygenase", Subpathway) ~ "Aromatic ring degradation: Dihydroxylation of aromatic ring"
   )) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, name)
 
 nuc.deg.merge <- nuc.deg %>%
   mutate(Subpathway = case_when(
@@ -385,12 +385,12 @@ nuc.deg.merge <- nuc.deg %>%
     grepl("pyrimidine", Subpathway) ~ "Nucleotide degradation: pyrimidine"
   )) %>%
   mutate(Pathway = "Nucleotide degradation") %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, name)
 
 lipid.deg.merge <- lipid.deg %>%
   mutate(Pathway = "Lipid degradation") %>%
   mutate(Subpathway = "Lipid degradation: other") %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, name)
 
 aa.deg.merge <- aa.deg %>%
   mutate(Pathway = "Amino acid degradation") %>%
@@ -403,11 +403,12 @@ aa.deg.merge <- aa.deg %>%
     grepl("serine", Subpathway) ~ "Amino acid degradation: Serine/glycine/threonine",
     grepl("shared", Subpathway) ~ "Amino acid degradation: Shared"
   )) %>%
-  select(KO, Pathway, Subpathway)
+  select(KO, Pathway, Subpathway, name)
 
 degradation <- rbind(aro.deg.merge, nuc.deg.merge, ring.deg.merge, lipid.deg.merge, aa.deg.merge) %>%
   mutate(Metabolism = "Degradation") %>%
-  select(KO, Metabolism, Pathway, Subpathway)
+  select(KO, Metabolism, Pathway, Subpathway, name) %>%
+  rename(Name = name)
 
 #co2 pathways
 co2_reformat <- co2 %>%
@@ -417,7 +418,8 @@ co2_reformat <- co2 %>%
   select(KO, Metabolism, Pathway, Subpathway)
 
 ##All Paul's pathways
-all.pathways <- rbind(biosynthesis, energy, degradation, co2_reformat)
+all.pathways <- rbind(biosynthesis, energy, degradation)
+write.csv(all.pathways, "../data/curated_ko_lists/curated_kos_combined_tableS1.csv")
 
 
   
@@ -550,6 +552,7 @@ deg_all <- make_sum_table(cue.timepoint, vip_kos, all_deg_kos)
    make_correlation_plots(d_eng_central) + ggtitle("Central C"),
    make_correlation_plots(d_eng_ferm) + ggtitle("Fermentation"),
    make_correlation_plots(d_eng_etc) + ggtitle("ETC"),
+   make_correlation_plots(d_eng_atp) + ggtitle("ATPase"),
    make_correlation_plots(bio_all) + ggtitle("All biosynthesis"),
    make_correlation_plots(eng_all) + ggtitle("All energy"),
    make_correlation_plots_with_legend(ratio_df, x_label ="ratio") + ggtitle("Biosyn:Energy ratio")
@@ -563,6 +566,7 @@ data_list <- list(
   d_eng_central,
   d_eng_ferm,
   d_eng_etc,
+  d_eng_atp,
   bio_all,
   eng_all,
   ratio_df
@@ -571,8 +575,8 @@ data_list <- list(
 annotated <- annotate_panels_with_fdr(p_list, data_list)
 
 top_row    <- wrap_plots(annotated[1:4],  nrow = 1)
-middle_row <- wrap_plots(annotated[5:7], nrow = 1)
-bottom_row <- wrap_plots(annotated[8:10], nrow = 1)
+middle_row <- wrap_plots(annotated[5:8], nrow = 1)
+bottom_row <- wrap_plots(annotated[9:11], nrow = 1)
 
 final_plot <- (top_row / middle_row / bottom_row) + 
               plot_layout(guides = 'collect') + 
@@ -587,8 +591,6 @@ final_plot <- (top_row / middle_row / bottom_row) +
  p_list <- list(
    make_correlation_plots(d_bio_teich) + ggtitle("Teichoic acid"),
    make_correlation_plots(d_bio_eps) + ggtitle("EPS"),
-   make_correlation_plots(d_eng_ferm) + ggtitle("Fermentation"),
-   make_correlation_plots(d_eng_atp) + ggtitle("ATPase"),
    make_correlation_plots(d_eng_pyrox) + ggtitle("Pyr. oxidation"),
    make_correlation_plots_with_legend(ratio_df_co2, x_label="ratio") + ggtitle("Biosyn:Energy (PDH)\n ratio")
  )
@@ -596,16 +598,14 @@ final_plot <- (top_row / middle_row / bottom_row) +
 data_list <- list(
   d_bio_teich,
   d_bio_eps,
-  d_eng_ferm,
-  d_eng_atp,
   d_eng_co2,
   ratio_df_co2
 )
 
 annotated <- annotate_panels_with_fdr(p_list, data_list)
 
-top_row    <- wrap_plots(annotated[1:3],  nrow = 1)
-middle_row <- wrap_plots(annotated[4:6], nrow = 1)
+top_row    <- wrap_plots(annotated[1:2],  nrow = 1)
+middle_row <- wrap_plots(annotated[3:4], nrow = 1)
 
 final_plot_supp <- (top_row / middle_row ) + 
               plot_layout(guides = 'collect') + 
@@ -648,5 +648,19 @@ final_plot_deg <- (top_row / middle_row) +
 # Assemble and save multi-panel figure (4) (a–k)
 ```
 
+```{r save}
 
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_10.png"), plot = final_plot, width = 12, height = 10, units = "in", dpi = 300)
+ggsave(file.path(out_dir, "CGE_vs_expression_grid_10.pdf"), plot = final_plot, width = 12, height = 12, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir_2, "CGE_vs_expression_grid_co2_10_supp.png"), plot = final_plot_supp, width = 7, height = 6, units = "in", dpi = 300)
+ggsave(file.path(out_dir_2, "CGE_vs_expression_grid_co2_10_supp.pdf"), plot = final_plot_supp, width = 7, height = 6, units = "in", dpi = 300)
+
+ggsave(file.path(out_dir_deg, "CGE_vs_expression_grid_deg_10.png"), plot = final_plot_deg, width = 10, height = 6, units = "in", dpi = 300)
+ggsave(file.path(out_dir_deg, "CGE_vs_expression_grid_deg_10.pdf"), plot = final_plot_deg, width = 10, height = 6, units = "in", dpi = 300)
+
+
+
+
+```
 
