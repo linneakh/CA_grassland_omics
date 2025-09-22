@@ -203,6 +203,22 @@ cts.t3 <- cts.final %>%
   filter(sum.count.per > 0.00000001) %>%
   dplyr::select(-c(gr.zero, sum.count.per, sum.count)) 
 
+#subset to t48
+coldata.t48 <- coldata.final %>%
+  filter(str_detect(rownames(.), "t48")) 
+
+limit = round(nrow(coldata.t48)*0.2)
+
+cts.t48 <- cts.final %>%
+  as.data.frame() %>%
+  dplyr::select(contains("t48")) %>%
+  mutate(sum.count = rowSums(.)) %>%
+  mutate(gr.zero = rowSums(. > 0)) %>%
+  filter(gr.zero > limit) %>%
+  mutate(sum.count.per = sum.count/sum(sum.count)) %>%
+  filter(sum.count.per > 0.00000001) %>%
+  dplyr::select(-c(gr.zero, sum.count.per, sum.count)) 
+
 
 ```
 
@@ -245,8 +261,36 @@ plotPCA(vstcounts, intgroup=c("Timepoint"), ntop = 10000)
 plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
 
 ```
+```{r}
+dds.t0.object <- DESeq(dds.t0)
+resultsNames(dds.t0.object) # lists the coefficients
 
+res <- results(dds.t0.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
 
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../deseq2_ko_res.csv")
+
+```
 
 
 
@@ -263,8 +307,15 @@ dds.no.t0 <- DESeqDataSetFromMatrix(countData = cts.no.t0,
                               colData = coldata.no.t0,
                               design= ~ Moisture * Timepoint)
 
+###create a deseq2 object with CGE level
+coldata.no.t0$CGE <- factor(coldata.no.t0$CGE, c("High", "Low"))
+
+coldata.no.t0$CGE <- relevel(coldata.no.t0$CGE, ref = "Low")
 
 
+dds.no.t0.cge <- DESeqDataSetFromMatrix(countData = cts.no.t0,
+                              colData = coldata.no.t0,
+                              design= ~ CGE)
 ```
 
 
@@ -293,8 +344,224 @@ plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000)
 ```
 
 
+```{r}
+dds.no.t0.object <- DESeq(dds.no.t0)
+resultsNames(dds.no.t0.object) # lists the coefficients
+
+res <- results(dds.no.t0.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../deseq2_no_t0_ko_res.csv")
+```
+
+
+```{r data_exploration}
+vstcounts <- vst(dds.no.t0.cge, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("CGE"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+#
+
+```
+
+
+```{r}
+dds.no.t0.cge.object <- DESeq(dds.no.t0.cge)
+resultsNames(dds.no.t0.cge.object) # lists the coefficients
+
+res <- results(dds.no.t0.cge.object, contrast = c("CGE","High","Low"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../output/metaT/deseq2_no_t0_ko_res_cge.csv")
+```
+
+```{r create_deseq2_object_reference_LD}
+
+###create a deseq2 object with Moisture and timepoint
+coldata.t3$Moisture <- factor(coldata.t3$Moisture, c("x50", "x100"))
+
+coldata.t3$Moisture <- relevel(coldata.t3$Moisture, ref = "x50")
+
+
+dds.t3 <- DESeqDataSetFromMatrix(countData = cts.t3,
+                              colData = coldata.t3,
+                              design= ~ Moisture)
+
+
+```
 
 
 
+```{r data_exploration}
+vstcounts <- vst(dds.t3, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+# export VST transformed table to be used for downstream analyses
+write.csv(vst.export, "../output/metaT/vst-ko-t3.csv")
 
 
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("CGE"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+#
+
+```
+
+
+```{r}
+dds.t3.object <- DESeq(dds.t3)
+resultsNames(dds.t3.object) # lists the coefficients
+
+res <- results(dds.t3.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../../output/metaT/deseq2_t3_res.csv")
+```
+
+```{r create_deseq2_object_reference_LD}
+
+###create a deseq2 object with Moisture and timepoint
+coldata.t48$Moisture <- factor(coldata.t48$Moisture, c("x50", "x100"))
+
+coldata.t48$Moisture <- relevel(coldata.t48$Moisture, ref = "x50")
+
+
+dds.t48 <- DESeqDataSetFromMatrix(countData = cts.t48,
+                              colData = coldata.t48,
+                              design= ~ Moisture)
+
+
+```
+
+
+
+```{r data_exploration}
+vstcounts <- vst(dds.t48, nsub=40, blind=TRUE)
+
+#plot cluster diagram
+dists.vst <- dist(t(assay(vstcounts)))
+plot(hclust(dists.vst))
+
+#export vst table
+vst.export<- assay(vstcounts)
+vst.export<- as.data.frame(vst.export)
+
+# export VST transformed table to be used for downstream analyses
+write.csv(vst.export, "../output/metaT/vst-ko-t48.csv")
+
+
+#explore PCA plots
+plotPCA(vstcounts, intgroup=c("CGE"), ntop = 10000) 
+plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
+
+#
+
+```
+
+```{r}
+dds.t48.object <- DESeq(dds.t48)
+resultsNames(dds.t48.object) # lists the coefficients
+
+res <- results(dds.t48.object, contrast = c("Moisture","x100","x50"))
+plotMA(res, ylim=c(-40,40))
+
+summary(res)
+
+#make volcano plot
+#reset par
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-40,40), ylim=c(0,40)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#merge with kegg brite levels and filter to significant values
+res.f <- as.data.frame(res) %>%
+  rownames_to_column(var = "KO") %>%
+  merge(kegg.brite, by = "KO", all.x = TRUE, all.y = FALSE) %>%
+  distinct() %>%
+  filter(padj<0.2) %>% 
+  arrange(log2FoldChange)
+res.f
+
+write.csv(res, "../../output/metaT/deseq2_t48_res.csv")
+```

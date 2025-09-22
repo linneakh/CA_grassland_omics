@@ -50,7 +50,7 @@ rates.100.168 <- read.delim("../output/100-growth-rates/all_rates_168h_16_18.txt
 
 
 #import taxonomy table and reformat
-tax.0 <- read.delim("../data/taxonomy_table_reads_USEME.txt", sep = "\t", header = FALSE)
+tax.0 <- read.delim("../data/taxonomy_table_reads.txt", sep = "\t", header = FALSE)
 tax <- tax.0 |>
   dplyr::rename(taxonID = V1) |>
   dplyr::rename(taxonomy = V2) 
@@ -191,8 +191,14 @@ plot.bar.d
 ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter.png", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
 ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter.pdf", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
 
-plot.bar.b_fixed
-plot.bar.d_fixed
+
+#50 and 100, death rates bar plots
+plot.bar.d_fixed_short <- bar_plot_d_fixed_short(rates.b.d.f.long)
+plot.bar.d_fixed_short
+ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter_fixed_short.png", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+ggsave(paste(Dir.f,"bar_50_100_d_f_new_Filter_fixed_short.pdf", sep = ""), width = 10, height = 5, units = "in", dpi = 300)
+
+
 
 ```
 

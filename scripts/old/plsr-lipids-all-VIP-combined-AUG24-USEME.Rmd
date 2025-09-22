@@ -63,7 +63,7 @@ colors.short = c("black", "gray","coral4",
 
 # load metabolite and growth data
 ```{r import data}
-cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
+cue <- read.csv("../../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
 cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
 
 #select only cue column
@@ -71,7 +71,7 @@ cue.only <- cue %>%
   dplyr::select(SampleID, CUE.metric)
 
 #load lipids
-datExpr.0b <- read.csv("../../qSIP-old-pipeline/qSIP_output/omics_datasets/lipids.csv", header = TRUE)
+datExpr.0b <- read.csv("../../../qSIP-old-pipeline/qSIP_output/omics_datasets/lipids.csv", header = TRUE)
 datExpr <- as.data.frame(datExpr.0b) %>%
   column_to_rownames(var = "X") %>%
   mutate_at(1:33, as.numeric) %>%
@@ -90,7 +90,7 @@ cue.all <- cue.only %>%
   dplyr::select(-c(Plot, Moisture, Timepoint)) %>%
   column_to_rownames(var = "SampleID") %>%
   mutate(CUE.metric.log = log(CUE.metric)) %>%
-  select(-CUE.metric)
+  dplyr::select(-CUE.metric)
 
 cue.timepoint <- cue.all %>%
   rownames_to_column(var = "SampleID") %>%

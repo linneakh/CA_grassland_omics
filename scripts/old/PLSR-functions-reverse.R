@@ -1,13 +1,13 @@
 # User-supplied plotting functions (kept verbatim) -------------------------
-make_correlation_plots <- function(df, x_label="transcript abundance (sum VST)") {
-  p <- ggplot(data = df, aes_string(x = "sum.vst", y = "CUE.metric.log", color = "Timepoint", shape = "Moisture")) +
+make_correlation_plots <- function(df, y_label="transcript abundance (sum VST)") {
+  p <- ggplot(data = df, aes_string(x = "CUE.metric.log", y = "sum.vst", color = "Timepoint", shape = "Moisture")) +
     geom_point(size = 3) +
     scale_color_viridis(discrete = TRUE,
                         direction = -1,
                         labels = c("3h", "24h", "48h", "72h", "168h")) +
     scale_shape_manual(values = shapes_moisture, breaks = c("x50", "x100"), labels = c("50%", "100%")) +
-    ylab("CGE metric (log)") +
-    xlab(x_label) +
+    xlab("CGE metric (log)") +
+    ylab(y_label) +
     geom_smooth(aes(group = "Moisture"), method = "lm", se = FALSE, color = "red4", size = 0.5) +
     theme_bw() +
     theme(
@@ -19,15 +19,15 @@ make_correlation_plots <- function(df, x_label="transcript abundance (sum VST)")
 }
 
 
-make_correlation_plots_with_legend <- function(df,x_label="transcript abundance (sum VST)") {
-  p <- ggplot(data = df, aes_string(x = "sum.vst", y = "CUE.metric.log", color = "Timepoint", shape = "Moisture")) +
+make_correlation_plots_with_legend <- function(df, y_label="transcript abundance (sum VST)") {
+  p <- ggplot(data = df, aes_string(x = "CUE.metric.log", y = "sum.vst", color = "Timepoint", shape = "Moisture")) +
     geom_point(size = 3) +
     scale_color_viridis(discrete = TRUE,
                         direction = -1,
                         labels = c("3h", "24h", "48h", "72h", "168h")) +
     scale_shape_manual(values = shapes_moisture, breaks = c("x50", "x100"), labels = c("50%", "100%")) +
-    ylab("CGE metric (log)") +
-    xlab(x_label) +
+    xlab("CGE metric (log)") +
+    ylab(y_label) +
     geom_smooth(aes(group = "Moisture"), method = "lm", se = FALSE, color = "red4", size = 0.5) +
     guides(color = guide_legend(nrow = 2)) +
     theme_bw() +
@@ -246,7 +246,7 @@ p = NA (n<3)"),
 
 # Collect p-values from multiple datasets (across all panels), adjust with FDR, and pass them to annotation
 # Collect p-values from multiple datasets (across all panels), adjust with FDR, and pass them to annotation
-annotate_panels_with_fdr <- function(p_list, data_list, x = "sum.vst", y = "CUE.metric.log", bottom_row_indices = NULL) {
+annotate_panels_with_fdr <- function(p_list, data_list, x = "CUE.metric.log", y = "sum.vst",  bottom_row_indices = NULL) {
   # Extract raw p-values from each dataset (per panel)
   get_p <- function(dat) {
     xv <- dat[[x]]; yv <- dat[[y]]
