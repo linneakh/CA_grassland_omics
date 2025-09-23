@@ -7,7 +7,7 @@
 #     based on scripts and functions by Nathalia Graf Grachet
 # Licensed under the MIT license. See LICENSE.md file.
 #
-# Modified by Linnea Honeker
+# Modified by Linnea Hernandez
 # ***************************************************************
 
 # Loading libraries ----
@@ -32,7 +32,7 @@ figure_dir <- './figures/Fig3-FigS3-H2O-fticr'
 
 
 # Loading custom functions ----
-source("./scripts/metabodirect-custom_functions.R")
+source("./scripts/functions/metabodirect-custom_functions.R")
 
 class_colors <- get_palette(palette = 'Set3', k = 9)
 names(class_colors) <- c(classification$Class, 'Other')

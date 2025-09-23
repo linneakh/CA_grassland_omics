@@ -1,9 +1,9 @@
 ---
 title: "PLS"
-author: "Linnea Honeker"
+author: "Linnea Hernandez"
 date: "2/26/24"
 output: html_document
-email: linneah@arizona.edu
+email: honeker1@llnl.gov
 ---
 
 ```{r setup, include=FALSE}

@@ -1,9 +1,9 @@
 ---
 title: "PLS"
-author: "Linnea Honeker"
+author: "Linnea Hernandez"
 date: "2/26/24"
 output: html_document
-email: linneah@arizona.edu
+email: honeker1@llnl.gov
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +28,7 @@ shapes_moisture <- c(x50 = 17, x100 = 16)
 
 col_list_moisture <- c("darkgreen", "brown")
 
-source("../scripts/PLSR-functions.R")
+source("../scripts/functions/PLSR-functions.R")
 
 out_dir = "../figures/Fig5-PLSR/"
 out_dir_2 = "../figures/FigS4-PLSR/"

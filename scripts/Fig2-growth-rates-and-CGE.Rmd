@@ -1,6 +1,6 @@
 ---
 title: "Fig 2- growth rates and CGE"
-author: "Linnea Honeker"
+author: "Linnea Hernandez"
 date: "2024-07-23"
 output: html_document
 ---

@@ -1,4 +1,4 @@
-##Linnea Honeker
+##Linnea Hernandez
 ##NMDS and PCA on metaT data from IMG
 ##2/26/24
 
@@ -20,6 +20,9 @@ col_list = c("red", "orange", "green",  "blue",  "purple", "pink")
 col_list_subject = c("turquoise3", "magenta3", "red3", "darkgreen", "yellow3", "blue3", "orange3", "grey")
 col_list_moisture <- c("darkgreen", "brown")
 list_of_shapes = c(17, 16,15,18,19, 20, 21)
+
+# load source code
+source("./scripts/functions/NMDS-functions.R")
 
 # parameters for plots
 h = 6

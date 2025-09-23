@@ -1,6 +1,6 @@
 ---
 title: "Fig1 taxon specific growth rates"
-author: "Linnea Honeker"
+author: "Linnea Hernandez"
 date: "2023-10-23"
 output: pdf_document
 ---
@@ -18,7 +18,7 @@ Dir.o = "../output/taxon-specific-growth-rates/"
 Dir.omics = "../output/omics_datasets/"
 
 
-source("../scripts/Fig1-functions-taxa-specific-rates.R")
+source("../scripts/functions/Fig1-functions-taxa-specific-rates.R")
 
 moisture_col_list <- c("darkgreen", "brown")
 

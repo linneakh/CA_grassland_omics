@@ -1,6 +1,6 @@
 ---
-title: "PhyloseqAndDeseq2"
-author: "Linnea Honeker"
+title: "Fig1e-bulk-phyloseq"
+author: "Linnea Hernandez"
 date: "1/18/2024"
 output: html_document
 ---
@@ -35,7 +35,7 @@ library(ggrepel)
 library(viridis)
 
 #load functions
-source("./NMDS-functions.R")
+source("./functions/NMDS-functions.R")
 
 #set aestetics
 col_list_2 <- c( "chartreuse3", "darkseagreen1","orange","lightgoldenrod","blue","lightblue", 
@@ -62,7 +62,7 @@ size = 10
 ```{r phyloseq object, echo=FALSE}
 ###load data and reformat to convert to phyloseq object
 #look at microbial community composition at time 0
-data.all <- read.table("../data/ASV_table_reads_with_sample_info.txt", header=T, sep="\t", stringsAsFactors=T, check.names=F) #Note that this input has total copies of 16S in original binned 
+data.all <- read.table("../data/qSIP/ASV_table_reads_with_sample_info.txt", header=T, sep="\t", stringsAsFactors=T, check.names=F) #Note that this input has total copies of 16S in original binned 
 #SIP fractions to account for the different volumes - See line 435 for further explanation
 
 #reanme treatment column for downstream analyses
@@ -160,7 +160,7 @@ data.meta <- norm_ASV_table %>%
 
 
 #Import taxa legend:
-taxa.id <- read.table("../data/taxonomy_table_reads.txt", 
+taxa.id <- read.table("../data/qSIP/taxonomy_table_reads.txt", 
                       header=F, sep="\t", stringsAsFactors=T, check.names=F, 
                       na.strings = "", col.names = c("taxon","code"))
 taxa.id2 <- taxa.id %>%
@@ -406,6 +406,7 @@ adonis2(Data.f.ra.bray ~ subject_id, data = sampledf)
 # Residual 60   3.5203 0.64302                  
 # Total    65   5.4747 1.00000    
 ```
+
 ```{r lme}
 library(emmeans)
 

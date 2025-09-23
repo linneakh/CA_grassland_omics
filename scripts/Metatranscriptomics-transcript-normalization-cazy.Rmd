@@ -1,6 +1,6 @@
 ---
 title: "metaT"
-author: "Linnea Honeker"
+author: "Linnea Hernandez"
 date: "11/26/2022; revised 4/22/24 for 4th wedge data"
 output: html_document
 ---
