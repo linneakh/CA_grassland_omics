@@ -306,7 +306,7 @@ Data.f.dat$Phylum[Data.f.dat$Abundance < 0.02] <- "Phylum < 2%"
 Data.f.dat$Hour <- factor(Data.f.dat$Hour, 
                         levels =c("t0", "t3", "t24", "t48", "t72", "t168"))
 Data.f.dat$treatment <- factor(Data.f.dat$treatment, 
-       levels =c("m50", "m100")) 
+       levels =c("m100", "m50")) 
 
 Data.f.dat <- Data.f.dat %>%
   mutate(Phylum = str_remove(Data.f.dat$Phylum, "p_"))
@@ -362,7 +362,6 @@ filename <- paste0("../figures/FigS1-NMDS/16S-nmds-bray.pdf")
 ggsave(filename,units=c('in'),width=w,height=h,dpi=res)
 
 
-plot <- make_nmds_plot_plot(data.scores)
 
 ```
 
@@ -409,6 +408,7 @@ adonis2(Data.f.ra.bray ~ subject_id, data = sampledf)
 
 ```{r lme}
 library(emmeans)
+library(lmerTest)
 
 ##linear mixed effects model on phyla across all timepoints
 
@@ -419,10 +419,12 @@ Firm <- Data.f.dat %>%
 m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Firm)
 anova(m)
 # Type III Analysis of Variance Table with Satterthwaite's method
-#                  Sum Sq   Mean Sq NumDF  DenDF F value    Pr(>F)    
-# treatment      0.000233 0.0002326     1  4.026  0.4849    0.5243    
-# Hour           0.044305 0.0088610     5 50.000 18.4722 2.378e-10 ***
-# treatment:Hour 0.003813 0.0007626     5 50.000  1.5897    0.1802    
+#                   Sum Sq   Mean Sq NumDF DenDF F value    Pr(>F)    
+# treatment      0.0000657 0.0000657     1     4  0.1690    0.7021    
+# Hour           0.0219776 0.0043955     5    20 11.3004 2.817e-05 ***
+# treatment:Hour 0.0005140 0.0001028     5    20  0.2643    0.9273    
+# ---
+# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 # Post-hoc pairwise contrasts at each timepoint
 em    <- emmeans(m, ~ treatment | Hour)
@@ -436,10 +438,10 @@ Proteo <- Data.f.dat %>%
 m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Proteo)
 anova(m)
 # Type III Analysis of Variance Table with Satterthwaite's method
-#                  Sum Sq  Mean Sq NumDF  DenDF F value    Pr(>F)    
-# treatment      0.052706 0.052706     1  4.296 18.7111 0.0105920 *  
-# Hour           0.085928 0.017186     5 50.000  6.1011 0.0001745 ***
-# treatment:Hour 0.019690 0.003938     5 50.000  1.3980 0.2411272 
+#                  Sum Sq  Mean Sq NumDF DenDF F value    Pr(>F)    
+# treatment      0.082699 0.082699     1     4 80.9187 0.0008455 ***
+# Hour           0.061506 0.012301     5    20 12.0364 1.799e-05 ***
+# treatment:Hour 0.010319 0.002064     5    20  2.0193 0.1194987  
 
 # Post-hoc pairwise contrasts at each timepoint
 em    <- emmeans(m, ~ treatment | Hour)
@@ -447,27 +449,27 @@ pairs(em, adjust="tukey")
 
 # Hour = t0:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.1452 0.0451 48.7  -3.220  0.0023
+#  m100 - m50   0.1455 0.0277 22.6   5.250  <.0001
 # 
 # Hour = t3:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.1194 0.0331 31.2  -3.609  0.0011
+#  m100 - m50   0.1908 0.0277 22.6   6.886  <.0001
 # 
 # Hour = t24:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.0567 0.0331 31.2  -1.715  0.0963
+#  m100 - m50   0.0993 0.0277 22.6   3.582  0.0016
 # 
 # Hour = t48:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.0427 0.0331 31.2  -1.291  0.2063
+#  m100 - m50   0.1311 0.0277 22.6   4.731  0.0001
 # 
 # Hour = t72:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.0631 0.0331 31.2  -1.907  0.0658
+#  m100 - m50   0.1026 0.0277 22.6   3.704  0.0012
 # 
 # Hour = t168:
 #  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100  -0.0501 0.0331 31.2  -1.514  0.1400
+#  m100 - m50   0.0941 0.0277 22.6   3.394  0.0025
 
 #Actinobacteria
 Actino <- Data.f.dat %>%
@@ -476,39 +478,39 @@ Actino <- Data.f.dat %>%
 m <- lmer(Abundance ~ treatment * Hour + (1|subject_id), data = Actino)
 anova(m)
 # Type III Analysis of Variance Table with Satterthwaite's method
-#                  Sum Sq  Mean Sq NumDF DenDF F value    Pr(>F)    
-# treatment      0.078299 0.078299     1    54 50.4711 2.789e-09 ***
-# Hour           0.084725 0.016945     5    54 10.9227 2.714e-07 ***
-# treatment:Hour 0.010566 0.002113     5    54  1.3622    0.2531    
+#                  Sum Sq  Mean Sq NumDF DenDF  F value    Pr(>F)    
+# treatment      0.076532 0.076532     1    24 109.6149 1.991e-10 ***
+# Hour           0.055067 0.011013     5    24  15.7742 6.555e-07 ***
+# treatment:Hour 0.006349 0.001270     5    24   1.8188    0.1472    
+# ---  
 
 # Post-hoc pairwise contrasts at each timepoint
 em    <- emmeans(m, ~ treatment | Hour)
 pairs(em, adjust="tukey")
 
 # Hour = t0:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.1217 0.0322 53.8   3.783  0.0004
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.1216 0.0216 24  -5.635  <.0001
 # 
 # Hour = t3:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.0931 0.0227 46.2   4.093  0.0002
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.1265 0.0216 24  -5.862  <.0001
 # 
 # Hour = t24:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.0619 0.0227 46.2   2.722  0.0091
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.0745 0.0216 24  -3.454  0.0021
 # 
 # Hour = t48:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.0656 0.0227 46.2   2.886  0.0059
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.1038 0.0216 24  -4.811  0.0001
 # 
 # Hour = t72:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.0506 0.0227 46.2   2.226  0.0309
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.0704 0.0216 24  -3.263  0.0033
 # 
 # Hour = t168:
-#  contrast   estimate     SE   df t.ratio p.value
-#  m50 - m100   0.0346 0.0227 46.2   1.519  0.1355
-
+#  contrast   estimate     SE df t.ratio p.value
+#  m100 - m50  -0.0565 0.0216 24  -2.620  0.0150
 
 ```
 
