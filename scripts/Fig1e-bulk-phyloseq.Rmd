@@ -353,7 +353,7 @@ data.scores <- my.ord.jaccard$vectors %>%
   mutate(moisture = str_replace(moisture, "m50", "x50")) %>%
   column_to_rownames(var = "SampleID")
 
-plot <- make_nmds_plot_time(data.scores)
+plot <- make_nmds_plot_moisture(data.scores)
 
 filename <- paste0("../figures/FigS1-NMDS/16S-nmds-bray.png")
 ggsave(filename,units=c('in'),width=w,height=h,dpi=res)

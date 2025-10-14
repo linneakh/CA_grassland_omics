@@ -187,6 +187,7 @@ plotPCA(vstcounts, intgroup=c("Timepoint"), ntop = 10000)
 plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000) 
 
 ```
+
 ```{r}
 dds.t0.object <- DESeq(dds.t0)
 resultsNames(dds.t0.object) # lists the coefficients
@@ -266,6 +267,7 @@ plotPCA(vstcounts, intgroup=c("Moisture"), ntop = 10000)
 #
 
 ```
+
 ```{r}
 dds.no.t0.object <- DESeq(dds.no.t0)
 resultsNames(dds.no.t0.object) # lists the coefficients
