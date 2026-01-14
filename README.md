@@ -1,7 +1,7 @@
 # CA_grassland_omics
 Scripts for the manuscript, "Reduced legacy precipitation decreases microbial community growth efficiency and alters soil organic carbon in a California grassland"
 
-Authors: Linnea K. Honeker1, Nicole Didonato2, Ljiljana Pasa-Tolic2, Pete F. Chuckran3, Mary K. Firestone3,4, Ella T. Sieradzki3,5, Mengting Maggie Yuan3,6, Katerina Estera-Molina1, Jeffrey Kimbrel1, Paul Dijkstra7, Jillian F. Banfield3, Jennifer Pett-Ridge1,8, Steven J. Blazewicz1
+Authors: Linnea K. Hernandez1, Nicole Didonato2, Ljiljana Pasa-Tolic2, Pete F. Chuckran3, Mary K. Firestone3,4, Ella T. Sieradzki3,5, Mengting Maggie Yuan3,6, Katerina Estera-Molina1, Jeffrey Kimbrel1, Paul Dijkstra7, Jillian F. Banfield3, Jennifer Pett-Ridge1,8, Steven J. Blazewicz1
 
 1	Physical and Life Science Directorate, Lawrence Livermore National Laboratory, Livermore, CA, USA.
 2	Environmental Molecular Science Laboratory (EMSL), Earth and Biological Sciences Division, Pacific Northwest National Laboratory, Richland, WA, USA

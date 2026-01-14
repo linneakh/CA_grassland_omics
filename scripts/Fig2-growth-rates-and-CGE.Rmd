@@ -524,7 +524,7 @@ plot <- df.final.gr.lenient.CUE %>%
    mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
   ggplot(aes(x=timepoint, y = mean, color = moisture)) +
   geom_point(size = 2) +
-  ylab(bquote('net new growth (16S copies '* ~g-soil^-1*')')) +
+  ylab(bquote('cumulative new biomass (16S copies '* ~g-soil^-1*')')) +
   xlab("timepoint (h)") +
   scale_y_log10(limits = c(2.5e7, 1.5e9)) +
   geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
