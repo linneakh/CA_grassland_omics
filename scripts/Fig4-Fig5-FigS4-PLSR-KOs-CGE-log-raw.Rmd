@@ -45,7 +45,7 @@ w2 = 4
 ```{r import data}
 # CGE (CUE)
 cue <- read.csv("../output/omics_datasets/cue_lenient.csv", header = TRUE) %>% dplyr::select(-any_of("X"))
-cue.only <- cue %>% dplyr::select(SampleID, CUE.metric)
+cue.only <- cue %>% dplyr::select(SampleID, CUE.g.dry.um)
 
 # Gene expression (VST, KO-level)
 datExpr.0b <- read.csv("../output/metaT/vst-ko-no-t0.csv", header = TRUE)
@@ -58,8 +58,8 @@ cue.all <- cue.only %>%
   tidyr::separate(SampleID, c("Plot", "Moisture", "Timepoint"), remove = FALSE) %>%
   dplyr::select(-Plot, -Moisture, -Timepoint) %>%
   tibble::column_to_rownames("SampleID") %>%
-  mutate(CUE.metric.log = log(CUE.metric)) %>%
-  dplyr::select(-CUE.metric)
+  mutate(CUE.metric.log = log(CUE.g.dry.um)) %>%
+  dplyr::select(-CUE.g.dry.um)
 
 cue.timepoint <- cue.all %>% 
   tibble::rownames_to_column("SampleID") %>% 
@@ -516,8 +516,8 @@ all_eng_kos <- unique(c(VIP_central, VIP_pomp, VIP_ferm, VIP_atp, VIP_pyrox, VIP
 bio_all <- make_sum_table(cue.timepoint, vip_kos, all_bio_kos)
 eng_all <- make_sum_table(cue.timepoint, vip_kos, all_eng_kos)
 
-bio_all <- make_mean_table(cue.timepoint, vip_kos, all_bio_kos)
-eng_all <- make_mean_table(cue.timepoint, vip_kos, all_eng_kos)
+# bio_all <- make_mean_table(cue.timepoint, vip_kos, all_bio_kos)
+# eng_all <- make_mean_table(cue.timepoint, vip_kos, all_eng_kos)
 
 
 # Ratio biosynthesis:energy

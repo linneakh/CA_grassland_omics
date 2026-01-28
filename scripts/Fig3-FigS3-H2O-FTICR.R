@@ -48,13 +48,57 @@ my_colors_moisture <- c("brown", "darkgreen")
 
 ## Defining paths
 my_data.file <- file.path(output_dir, 'metabodirect', 'Report_processed_noNorm_MolecFormulas.csv')
+my_data.file.raw <- file.path('./data/FTICR/4W_FTICRMS_H2O_neg_blank_corrected_no_extra.csv')
+my_data.file.noNOrm <- file.path(output_dir, 'metabodirect', 'Report_processed_noNorm.csv')
 my_metadata.file <- file.path('./data/FTICR/metadata-H20-no-extra.csv')
 my_classcomp.file <- file.path(output_dir,'metabodirect', 'class_composition.csv')
 
 ## Loading tables
 df <- read_csv(my_data.file)
+df.raw <- read_csv(my_data.file.raw)
+df.noNorm <- read_csv(my_data.file.noNOrm)
 metadata <- read_csv(my_metadata.file)
 class_comp <- read_csv(my_classcomp.file)
+
+##summarize counts (total and with formula)
+#total raw
+df.raw.50 <- df.raw %>%
+  select(contains("50pct"))
+
+df.raw.50.present <- df.raw.50[rowSums(df.raw.50) != 0, ]
+nrow(df.raw.50.present) #24391 compounds
+
+df.raw.100 <- df.raw %>%
+  select(contains("100pct"))
+
+df.raw.100.present <- df.raw.100[rowSums(df.raw.100) != 0, ]
+nrow(df.raw.100.present) #23765 compounds
+
+#total noNorm (filtered features < 2 samples)
+df.noNorm.50 <- df.noNorm %>%
+  select(contains("50pct"))
+
+df.noNorm.50.present <- df.noNorm.50[rowSums(df.noNorm.50) != 0, ]
+nrow(df.noNorm.50.present) #18199 compounds
+
+df.noNorm.100 <- df.noNorm %>%
+  select(contains("100pct"))
+
+df.noNorm.100.present <- df.noNorm.100[rowSums(df.noNorm.100) != 0, ]
+nrow(df.noNorm.100.present) #17895 compounds
+
+#formula
+df.50 <- df %>%
+  select(contains("50pct"))
+
+df.50.present <- df.50[rowSums(df.50) != 0, ]
+nrow(df.50.present) #8912 compounds
+
+df.100 <- df %>%
+  select(contains("100pct"))
+
+df.100.present <- df.100[rowSums(df.100) != 0, ]
+nrow(df.100.present) #8673 compounds
 
 # Reformat data files ----
 

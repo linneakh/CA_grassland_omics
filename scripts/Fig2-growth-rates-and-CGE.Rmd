@@ -34,13 +34,13 @@ moisture_col_list <- c("darkgreen", "brown")
 df.0 <- read.csv("../data/CO2-ppm.csv", header = TRUE)
 
 #load biomass (16S copies / g soil) data
-source.df <- read.csv("../data/sample_source_biomass_info.csv", header = TRUE) %>% select(-X)
+source.df <- read.csv("../data/qSIP/sample_source_biomass_info.csv", header = TRUE) %>% select(-X)
 
 #load soil moisture data
 sm.0 <- read.csv("../data/soil_moisture.csv")
 
 #load SIP efficiency
-SIP.0 <- read.csv("../data/qPCR_efficiency.csv")
+SIP.0 <- read.csv("../data/qSIP/qPCR_efficiency.csv")
 
 #reformat qSIP data to make mergable
 SIP <- SIP.0 %>%
@@ -128,7 +128,7 @@ df.final.gr.lenient.CUE <- df.final.gr.lenient %>%
   mutate(timepoint.num = as.numeric(str_remove(timepoint, "t"))) %>%
   mutate(b.boot.median.dry = b.boot.median * (1 + (sm_rewet/100))) %>% #adjust birth rates for soil moisture
   mutate(d.boot.median.dry = d.boot.median * (1 + (sm_rewet/100))) %>% #adjust death rates for soil moisture
-  mutate(net.growth.copies.dry.g = b.boot.median.dry * (timepoint.num/24)) %>% #cumulative new growth
+  mutate(cum.growth.copies.dry.g = b.boot.median.dry * (timepoint.num/24)) %>% #cumulative new growth
   mutate(dead.copies.total.dry.g = d.boot.median.dry * (timepoint.num/24)) %>% #cumulative mortality
   mutate(soil.g.dry.vial = case_when(
     (timepoint == "t0") ~ (s / (1 + (sm_t0/100))),
@@ -144,8 +144,9 @@ df.final.gr.lenient.CUE <- df.final.gr.lenient %>%
   mutate(n.headspace.air.2 = (1 * headspace.jar)/(0.0821 * 273.15)) %>% #n = PV/RT (moles of air, this is correct)
   mutate(CO2.moles.headspace = (n.headspace.air.2 * (CO2_ppm/10^6))) %>% #moles of CO2 in headspace
   mutate(CO2.moles.g.dry = CO2.moles.headspace / soil.g.dry.jar) %>%
-  mutate(CUE.g.dry = net.growth.copies.dry.g / CO2.moles.g.dry) %>%
-  mutate(biomass.C.g.dry.g = ((net.growth.copies.dry.g * 10) / (5 * 10^15))) %>% #10 fg C / microbe; average 5 copies of 16S per microbe
+  mutate(CUE.g.dry = cum.growth.copies.dry.g / CO2.moles.g.dry) %>% #units: 16S copies/CO2 moles
+  mutate(CUE.g.dry.um = CUE.g.dry / 10^6) %>% #units: 16S copies/CO2 umol
+  mutate(biomass.C.g.dry.g = ((cum.growth.copies.dry.g * 10) / (5 * 10^15))) %>% #10 fg C / microbe; average 5 copies of 16S per microbe
   mutate(CO2.g.g.dry = CO2.moles.g.dry * 12.01) %>% #12.01 = molar mass of carbon to convert moles to mass
   mutate(CUE.real.g.dry = biomass.C.g.dry.g / (biomass.C.g.dry.g + CO2.g.g.dry))
 
@@ -224,7 +225,7 @@ pairs(em, adjust="tukey")
 
 #####bnet growth
 #all rewet time points
-m <- lmer(net.growth.copies.dry.g ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
+m <- lmer(cum.growth.copies.dry.g ~ moisture * timepoint + (1|plot), data = df.final.gr.lenient.CUE.2)
 anova(m)
 #Type III Analysis of Variance Table with Satterthwaite's method
 #                       Sum Sq    Mean Sq NumDF DenDF F value    Pr(>F)    
@@ -517,8 +518,8 @@ plot <- df.final.gr.lenient.CUE %>%
   mutate(moisture = as.factor(moisture)) %>%
   filter(timepoint != "t0") %>%
   group_by(moisture, timepoint) %>%
-  summarise(mean = mean(net.growth.copies.dry.g),
-            sd = sd(net.growth.copies.dry.g),
+  summarise(mean = mean(cum.growth.copies.dry.g),
+            sd = sd(cum.growth.copies.dry.g),
             se = sd/sqrt(n())) %>%
   mutate(log.mean = log10(mean)) %>%
    mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
@@ -582,6 +583,52 @@ summary(lm(df.50$net.growth.copies.dry.g ~ log(df.50$timepoint.num)) )
 # Multiple R-squared:  0.8333,	Adjusted R-squared:  0.824 
 # F-statistic: 89.95 on 1 and 18 DF,  p-value: 2.004e-08
 
+#CUE  (16S copies / umol CO2)
+plot <- df.final.gr.lenient.CUE.2 %>%
+  mutate(moisture = as.factor(moisture)) %>%
+  group_by(moisture, timepoint) %>%
+  summarise(mean = mean(CUE.g.dry.um),
+            sd = sd(CUE.g.dry.um),
+            se = sd/sqrt(n())) %>%
+   mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                width = 4) +
+  ylab(expression(CGE~"(" * "16S copies"~mu*mol~CO[2]^{-1} * ")")) +
+  #ylab(bquote('cumulative new biomass (16S copies '* ~g-soil^-1*')')) +
+  scale_y_log10() +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/CGE-biomass-CO2.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/CGE-biomass-CO2.pdf", dpi = 300, width = 4, height = 4, units = "in")
+
+#CUE  (log 16S copies / umol CO2)
+plot <- df.final.gr.lenient.CUE.2 %>%
+  mutate(moisture = as.factor(moisture)) %>%
+  group_by(moisture, timepoint) %>%
+  summarise(mean = mean(CUE.g.dry.um),
+            sd = sd(CUE.g.dry.um),
+            se = sd/sqrt(n())) %>%
+   mutate(timepoint = as.numeric(str_remove(timepoint, "t"))) %>%
+  ggplot(aes(x=timepoint, y = mean, color = moisture)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se),
+                width = 4) +
+  ylab(expression(CGE~"(" * "16S copies"~mu*mol~CO[2]^{-1} * ")")) +
+  scale_y_log10() +
+  geom_smooth(linewidth = 0.25, method = "lm", formula = "y ~ log(x)", se=FALSE, size=1) +
+  scale_color_manual(values = c(moisture_col_list)) +
+  theme_bw() +
+   theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank())
+ plot
+ggsave("../Figures/Fig2-growth-rates-CGE/CGE-biomass-CO2.png", dpi = 300, width = 4, height = 4, units = "in")
+ggsave("../Figures/Fig2-growth-rates-CGE/CGE-biomass-CO2.pdf", dpi = 300, width = 4, height = 4, units = "in")
 
 #CUE metric (value 0 to 1)
 plot <- df.final.gr.lenient.CUE.2 %>%

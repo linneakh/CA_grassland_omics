@@ -125,6 +125,26 @@ save_plot_duo <- function(plot, file_stub, width = 3.25, height = 3, dpi = 300) 
   ggsave(paste0(file_stub, ".pdf"), plot = plot, width = width, height = height, units = "in", dpi = dpi)
 }
 
+make_mean_table <- function(cue_timepoint, vip_kos, ko_subset) {
+  keep <- intersect(vip_kos, ko_subset)
+  if (length(keep) == 0) {
+    return(tibble(SampleID = character(), CUE.metric.log = numeric(), sum.vst = numeric(), Timepoint = factor(), Moisture = factor()))
+  }
+  cue_timepoint %>%
+    dplyr::select(SampleID, CUE.metric.log, all_of(keep), Timepoint, Moisture) %>%
+    pivot_longer(cols = all_of(keep), names_to = "KO", values_to = "VST") %>%
+    group_by(SampleID, Timepoint, Moisture) %>%
+    summarise(sum.vst = mean(VST, na.rm = TRUE), CUE.metric.log = mean(CUE.metric.log, na.rm = TRUE), .groups = "drop") %>%
+    mutate(Timepoint = factor(Timepoint, levels = c("t0", "t3", "t24", "t48", "t72", "t168")),
+           Moisture = factor(Moisture, levels = c("x50", "x100")))
+}
+
+save_plot_duo <- function(plot, file_stub, width = 3.25, height = 3, dpi = 300) {
+  ggsave(paste0(file_stub, ".png"), plot = plot, width = width, height = height, units = "in", dpi = dpi)
+  ggsave(paste0(file_stub, ".pdf"), plot = plot, width = width, height = height, units = "in", dpi = dpi)
+}
+
+
 # Data wrangling helpers ----------------------------------------------------
 # Intersect curated KOs with VIP list, sum VST per-sample for those KOs
 make_sum_table_no_intersect <- function(cue_timepoint, ko_subset) {

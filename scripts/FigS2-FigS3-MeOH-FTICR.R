@@ -48,13 +48,57 @@ my_colors_moisture <- c("brown", "darkgreen")
 
 ## Defining paths
 my_data.file <- file.path(output_dir, 'metabodirect', 'Report_processed_noNorm_MolecFormulas.csv')
+my_data.file.raw <- file.path('./data/FTICR/4W_FTICRMS_MeOH_neg_blank_corrected_no_extras.csv')
+my_data.file.noNOrm <- file.path(output_dir, 'metabodirect', 'Report_processed_noNorm.csv')
 my_metadata.file <- file.path('./data/FTICR/metadata-MeOH-no-extra-no-out.csv')
 my_classcomp.file <- file.path(output_dir,'metabodirect', 'class_composition.csv')
 
 ## Loading tables
 df <- read_csv(my_data.file)
+df.raw <- read_csv(my_data.file.raw)
+df.noNorm <- read_csv(my_data.file.noNOrm)
 metadata <- read_csv(my_metadata.file)
 class_comp <- read_csv(my_classcomp.file)
+
+##summarize counts (total and with formula)
+#total raw
+df.raw.50 <- df.raw %>%
+  select(contains("50pct"))
+
+df.raw.50.present <- df.raw.50[rowSums(df.raw.50) != 0, ]
+nrow(df.raw.50.present) #19252 compounds
+
+df.raw.100 <- df.raw %>%
+  select(contains("100pct"))
+
+df.raw.100.present <- df.raw.100[rowSums(df.raw.100) != 0, ]
+nrow(df.raw.100.present) #13997 compounds
+
+#total noNorm (filtered features < 2 samples)
+df.noNorm.50 <- df.noNorm %>%
+  select(contains("50pct"))
+
+df.noNorm.50.present <- df.noNorm.50[rowSums(df.noNorm.50) != 0, ]
+nrow(df.noNorm.50.present) #10084 compounds
+
+df.noNorm.100 <- df.noNorm %>%
+  select(contains("100pct"))
+
+df.noNorm.100.present <- df.noNorm.100[rowSums(df.noNorm.100) != 0, ]
+nrow(df.noNorm.100.present) #9701 compounds
+
+#formula
+df.50 <- df %>%
+  select(contains("50pct"))
+
+df.50.present <- df.50[rowSums(df.50) != 0, ]
+nrow(df.50.present) #5636 compounds
+
+df.100 <- df %>%
+  select(contains("100pct"))
+
+df.100.present <- df.100[rowSums(df.100) != 0, ]
+nrow(df.100.present) #5369 compounds
 
 # Reformat data files ----
 
@@ -668,6 +712,47 @@ tab_unique_thresh <- df_longer_orig %>%
   ) %>%
   column_to_rownames("Class") %>%
   as.matrix() 
+
+# u100 u50
+# Amino sugar    23  37
+# Carbohydrate   50  59
+# Cond. HC       30 115
+# Lignin        118 297
+# Lipid          19  66
+# Protein        40 101
+# Tannin          9  41
+# Unsat. HC       4   5
+# Other           0   4
+
+tab_unique_tresh_RA <- tab_unique_thresh %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "Class") %>%
+  gather(key = "Treatment", "Counts", -Class) %>%
+  group_by(Treatment) %>%
+  mutate(RA = Counts/sum(Counts) * 100)
+
+# Class        Treatment Counts     RA
+# <chr>        <chr>      <int>  <dbl>
+#   1 Amino sugar  u100          23  7.85 
+# 2 Carbohydrate u100          50 17.1  
+# 3 Cond. HC     u100          30 10.2  
+# 4 Lignin       u100         118 40.3  
+# 5 Lipid        u100          19  6.48 
+# 6 Protein      u100          40 13.7  
+# 7 Tannin       u100           9  3.07 
+# 8 Unsat. HC    u100           4  1.37 
+# 9 Other        u100           0  0    
+# 10 Amino sugar  u50           37  5.10 
+# 11 Carbohydrate u50           59  8.14 
+# 12 Cond. HC     u50          115 15.9  
+# 13 Lignin       u50          297 41.0  
+# 14 Lipid        u50           66  9.10 
+# 15 Protein      u50          101 13.9  
+# 16 Tannin       u50           41  5.66 
+# 17 Unsat. HC    u50            5  0.690
+# 18 Other        u50            4  0.552
+
+
   
 # 4) Run the G‐test and look at standardized residuals
 GTest(tab_unique_thresh)
